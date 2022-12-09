@@ -159,26 +159,6 @@ func (r endpointResource) Schema(ctx context.Context, req resource.SchemaRequest
 	}
 }
 
-/*func (r endpointResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*http.Client)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	r.client = client
-}*/
-
 type endpointSettings struct {
 	Description string            `json:"description"`
 	Pg_settings map[string]string `json:"pg_settings"`
