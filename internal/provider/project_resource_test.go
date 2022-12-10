@@ -7,16 +7,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestEndpointResource(t *testing.T) {
+func TestProjectResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testNeonEndpointResourceConfig1(),
+				Config: testNeonProjectResourceBasic(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("neon_endpoint.test", "branch_id", "branch"),
+					resource.TestCheckResourceAttr("neon_project.test", "name", "name"),
 				),
 			},
 			// ImportState testing
@@ -42,15 +42,17 @@ func TestEndpointResource(t *testing.T) {
 	})
 }
 
-func testNeonEndpointResourceConfig2() string {
+func testNeonProjectResourceBasic() string {
 	return fmt.Sprintf(`
-resource "neon_endpoint" "test" {
-	branch_id = "branch"
-	type = "read_write"
+resource "neon_project" "test" {
+	project {
+		name = "name"
+	}
 }
 `)
 }
-func testNeonEndpointResourceConfig1() string {
+
+/*func testNeonProjectResourceComplex_1() string {
 	return `
 provider "neon" {}
 resource "neon_endpoint" "test" {
@@ -73,4 +75,4 @@ resource "neon_endpoint" "test" {
 	passwordless_access = true
 }
 `
-}
+}*/

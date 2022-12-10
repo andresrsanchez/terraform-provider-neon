@@ -52,6 +52,7 @@ func (provider neon) Configure(ctx context.Context, req provider.ConfigureReques
 func (p neon) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewEndpointResource,
+		NewProjectResource,
 	}
 }
 

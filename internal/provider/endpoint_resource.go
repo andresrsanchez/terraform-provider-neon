@@ -30,30 +30,6 @@ type endpointResource struct {
 	client *http.Client
 }
 
-type endpointResourceModel struct {
-	Host                  types.String `tfsdk:"host"`
-	Id                    types.String `tfsdk:"id"`
-	ProjectID             types.String `tfsdk:"project_id"`
-	BranchID              types.String `tfsdk:"branch_id"`
-	AutoscalingLimitMinCu types.Int64  `tfsdk:"autoscaling_limit_min_cu"`
-	AutoscalingLimitMaxCu types.Int64  `tfsdk:"autoscaling_limit_max_cu"`
-	RegionID              types.String `tfsdk:"region_id"`
-	Type                  types.String `tfsdk:"type"`
-	CurrentState          types.String `tfsdk:"current_state"`
-	PendingState          types.String `tfsdk:"pending_state"`
-	Settings              struct {
-		Description types.String `tfsdk:"description"`
-		PgSettings  types.List   `tfsdk:"pg_settings"`
-	} `tfsdk:"settings"`
-	PoolerEnabled      types.Bool   `tfsdk:"pooler_enabled"`
-	PoolerMode         types.String `tfsdk:"pooler_mode"`
-	Disabled           types.Bool   `tfsdk:"disabled"`
-	PasswordlessAccess types.Bool   `tfsdk:"passwordless_access"`
-	LastActive         types.String `tfsdk:"last_active"`
-	CreatedAt          types.String `tfsdk:"created_at"`
-	UpdatedAt          types.String `tfsdk:"updated_at"`
-}
-
 func (r endpointResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_endpoint"
 }
@@ -159,21 +135,17 @@ func (r endpointResource) Schema(ctx context.Context, req resource.SchemaRequest
 	}
 }
 
-type endpointSettings struct {
-	Description string            `json:"description"`
-	Pg_settings map[string]string `json:"pg_settings"`
-}
 type createEndpoint struct {
-	Branch_id                string           `json:"branch_id"`
-	Region_id                string           `json:"region_id,omitempty"`
-	Type                     string           `json:"type"`
-	Settings                 endpointSettings `json:"settings,omitempty"`
-	Autoscaling_limit_min_cu int64            `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64            `json:"autoscaling_limit_max_cu,omitempty"`
-	Pooler_enabled           bool             `json:"pooler_enabled,omitempty"`
-	Pooler_mode              string           `json:"pooler_mode,omitempty"`
-	Disabled                 bool             `json:"disabled,omitempty"`
-	Passwordless_access      bool             `json:"passwordless_access,omitempty"`
+	Branch_id                string                `json:"branch_id"`
+	Region_id                string                `json:"region_id,omitempty"`
+	Type                     string                `json:"type"`
+	Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
+	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
+	Pooler_enabled           bool                  `json:"pooler_enabled,omitempty"`
+	Pooler_mode              string                `json:"pooler_mode,omitempty"`
+	Disabled                 bool                  `json:"disabled,omitempty"`
+	Passwordless_access      bool                  `json:"passwordless_access,omitempty"`
 }
 
 func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -196,18 +168,8 @@ func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest
 		Disabled:                 data.Disabled.ValueBool(),
 		Passwordless_access:      data.PasswordlessAccess.ValueBool(),
 	}
-	if !data.Settings.Description.IsUnknown() {
-		s := make(map[string]string)
-		for _, v := range data.Settings.PgSettings.Elements() {
-			pg_settings := v.(types.Map)
-			for k, setting := range pg_settings.Elements() {
-				s[k] = setting.String()
-			}
-		}
-		content.Settings = endpointSettings{
-			data.Settings.Description.ValueString(),
-			s,
-		}
+	if data.Settings != nil {
+		content.Settings = data.Settings.ToEndpointSettingsJSON()
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -231,16 +193,19 @@ func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest
 	request.Header.Add("Authorization", "Bearer "+key)
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
-	if err != nil || response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
 	endpoint := struct {
-		Endpoint endpointResourceModel `json:"endpoint"`
+		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
 	err = json.NewDecoder(response.Body).Decode(&endpoint)
-	data = endpoint.Endpoint
+	data = *endpoint.Endpoint.ToEndpointResourceModel()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -280,15 +245,18 @@ func (r endpointResource) Read(ctx context.Context, req resource.ReadRequest, re
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
 	endpoint := struct {
-		Endpoint endpointResourceModel `json:"endpoint"`
+		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
 	err = json.NewDecoder(response.Body).Decode(&endpoint)
-	data = endpoint.Endpoint
+	data = *endpoint.Endpoint.ToEndpointResourceModel()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -309,14 +277,14 @@ func (r endpointResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 type updateEndpoint struct {
-	Branch_id                string           `json:"branch_id"`
-	Settings                 endpointSettings `json:"settings,omitempty"`
-	Autoscaling_limit_min_cu int64            `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64            `json:"autoscaling_limit_max_cu,omitempty"`
-	Pooler_enabled           bool             `json:"pooler_enabled,omitempty"`
-	Pooler_mode              string           `json:"pooler_mode,omitempty"`
-	Disabled                 bool             `json:"disabled,omitempty"`
-	Passwordless_access      bool             `json:"passwordless_access,omitempty"`
+	Branch_id                string                `json:"branch_id"`
+	Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
+	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
+	Pooler_enabled           bool                  `json:"pooler_enabled,omitempty"`
+	Pooler_mode              string                `json:"pooler_mode,omitempty"`
+	Disabled                 bool                  `json:"disabled,omitempty"`
+	Passwordless_access      bool                  `json:"passwordless_access,omitempty"`
 }
 
 func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -338,17 +306,7 @@ func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest
 		Passwordless_access:      data.PasswordlessAccess.ValueBool(),
 	}
 	if !data.Settings.Description.IsUnknown() {
-		s := make(map[string]string)
-		for _, v := range data.Settings.PgSettings.Elements() {
-			pg_settings := v.(types.Map)
-			for k, setting := range pg_settings.Elements() {
-				s[k] = setting.String()
-			}
-		}
-		content.Settings = endpointSettings{
-			data.Settings.Description.ValueString(),
-			s,
-		}
+		content.Settings = data.Settings.ToEndpointSettingsJSON()
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -372,16 +330,19 @@ func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest
 	request.Header.Add("Authorization", "Bearer "+key)
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
-	if err != nil || response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to update endpoint", err.Error())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
 	endpoint := struct {
-		Endpoint endpointResourceModel `json:"endpoint"`
+		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
 	err = json.NewDecoder(response.Body).Decode(&endpoint)
-	data = endpoint.Endpoint
+	data = *endpoint.Endpoint.ToEndpointResourceModel()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -415,9 +376,12 @@ func (r endpointResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 	request.Header.Add("Authorization", "Bearer "+key)
-	_, err = r.client.Do(request)
+	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	resp.State.RemoveResource(ctx)

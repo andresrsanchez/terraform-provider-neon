@@ -17,137 +17,84 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+var _ resource.Resource = projectResource{}
+var _ resource.ResourceWithImportState = projectResource{}
+
 func NewProjectResource() resource.Resource {
 	return projectResource{
 		client: &http.Client{},
 	}
 }
 
-type projectResource struct {
-	client *http.Client
-}
-type roleResourceModel struct {
-	BranchID  types.String `tfsdk:"branch_id"`
-	Name      types.String `tfsdk:"name"`
-	Password  types.String `tfsdk:"password"`
-	Protected types.Bool   `tfsdk:"protected"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
-}
-type databaseResourceModel struct {
-	ID        types.Int64  `tfsdk:"id"`
-	BranchID  types.String `tfsdk:"branch_id"`
-	Name      types.String `tfsdk:"name"`
-	OwnerName types.String `tfsdk:"owner_name"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
-}
-type branchResourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	ProjectID    types.String `tfsdk:"project_id"`
-	ParentID     types.String `tfsdk:"parent_id"`
-	ParentLsn    types.String `tfsdk:"parent_lsn"`
-	Name         types.String `tfsdk:"name"`
-	CurrentState types.String `tfsdk:"current_state"`
-	CreatedAt    types.String `tfsdk:"created_at"`
-	UpdatedAt    types.String `tfsdk:"updated_at"`
-}
-type projectConnUris struct {
-	ConnectionURI types.String `tfsdk:"connection_uri"`
-}
-type projectDefaultEndpointSettings struct {
-	PgSettings types.Map `tfsdk:"pg_settings"`
-}
-type innerProjectModel struct {
-	MaintenanceStartsAt      types.String                   `tfsdk:"maintenance_starts_at"`
-	ID                       types.String                   `tfsdk:"id"`
-	PlatformID               types.String                   `tfsdk:"platform_id"`
-	RegionID                 types.String                   `tfsdk:"region_id"`
-	Name                     types.String                   `tfsdk:"name"`
-	Provisioner              types.String                   `tfsdk:"provisioner"`
-	DefaultEndpointSettings  projectDefaultEndpointSettings `tfsdk:"default_endpoint_settings"`
-	PgVersion                types.Int64                    `tfsdk:"pg_version"`
-	Autoscaling_limit_min_cu types.Int64                    `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu types.Int64                    `json:"autoscaling_limit_max_cu,omitempty"`
-	LastActive               types.String                   `tfsdk:"last_active"`
-	CreatedAt                types.String                   `tfsdk:"created_at"`
-	UpdatedAt                types.String                   `tfsdk:"updated_at"`
-}
-type projectResourceModel struct {
-	Project        innerProjectModel       `tfsdk:"project"`
-	ConnectionUris []projectConnUris       `tfsdk:"connection_uris"`
-	Roles          []roleResourceModel     `tfsdk:"roles"`
-	Databases      []databaseResourceModel `tfsdk:"databases"`
-	Branch         branchResourceModel     `tfsdk:"branch"`
-	Endpoints      []endpointResourceModel `tfsdk:"endpoints"`
-}
-
 func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"maintenance_starts_at": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"platform_id": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"region_id": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"name": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"provisioner": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"default_endpoint_settings": schema.ObjectAttribute{
-				AttributeTypes: map[string]attr.Type{
-					"pg_settings": types.MapType{
-						ElemType: types.StringType,
-					},
-				},
-				Computed: true,
-				Optional: true,
-			},
-			"pg_version": schema.Int64Attribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			//validate dates
-			"last_active": schema.StringAttribute{
-				MarkdownDescription: "last active",
-				Computed:            true,
-			},
-			"created_at": schema.StringAttribute{
-				MarkdownDescription: "created at",
-				Computed:            true,
-			},
-			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "updated at",
-				Computed:            true,
-			},
-			"connection_uris": schema.ListNestedAttribute{
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"connectionUri": schema.StringAttribute{
-							Required: true,
-						},
-					},
-				},
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-		},
 		Blocks: map[string]schema.Block{
+			"project": schema.SingleNestedBlock{
+				Attributes: map[string]schema.Attribute{
+					"default_endpoint_settings": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{
+							"description": schema.StringAttribute{
+								Required: true,
+							},
+							"pg_settings": schema.MapAttribute{
+								Required:    true,
+								ElementType: types.StringType,
+							},
+						},
+						Optional: true,
+					},
+					"autoscaling_limit_min_cu": schema.Int64Attribute{
+						MarkdownDescription: "autoscaling limit min",
+						Computed:            true,
+					},
+					"autoscaling_limit_max_cu": schema.Int64Attribute{
+						MarkdownDescription: "autoscaling limit max",
+						Computed:            true,
+					},
+					"maintenance_starts_at": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+					"id": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+					"platform_id": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+					"region_id": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Required:            true,
+					},
+					"provisioner": schema.StringAttribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+
+					"pg_version": schema.Int64Attribute{
+						MarkdownDescription: "neon host",
+						Computed:            true,
+					},
+					//validate dates
+					"last_active": schema.StringAttribute{
+						MarkdownDescription: "last active",
+						Computed:            true,
+					},
+					"created_at": schema.StringAttribute{
+						MarkdownDescription: "created at",
+						Computed:            true,
+					},
+					"updated_at": schema.StringAttribute{
+						MarkdownDescription: "updated at",
+						Computed:            true,
+					},
+				},
+			},
 			"roles": schema.ListNestedBlock{
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
@@ -221,6 +168,15 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					},
 					"updated_at": schema.StringAttribute{
 						Computed: true,
+					},
+				},
+			},
+			"connection_uris": schema.ListNestedBlock{
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"connection_uri": schema.StringAttribute{
+							Required: true,
+						},
 					},
 				},
 			},
@@ -322,13 +278,13 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 }
 
 type createProject struct {
-	Name                     string           `json:"name,omitempty"`
-	Provisioner              string           `json:"provisioner,omitempty"`
-	RegionID                 string           `json:"region_id,omitempty"`
-	PgVersion                int64            `json:"pg_version,omitempty"`
-	Settings                 endpointSettings `json:"default_endpoint_settings,omitempty"`
-	Autoscaling_limit_min_cu int64            `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64            `json:"autoscaling_limit_max_cu,omitempty"`
+	Name                     string                `json:"name,omitempty"`
+	Provisioner              string                `json:"provisioner,omitempty"`
+	RegionID                 string                `json:"region_id,omitempty"`
+	PgVersion                int64                 `json:"pg_version,omitempty"`
+	Settings                 *endpointSettingsJSON `json:"default_endpoint_settings,omitempty"`
+	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
 }
 
 func (r projectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -340,27 +296,21 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	content := createProject{
+	c := createProject{
 		Name:                     data.Project.Name.ValueString(),
 		Provisioner:              data.Project.Provisioner.ValueString(),
 		RegionID:                 data.Project.RegionID.ValueString(),
 		PgVersion:                data.Project.PgVersion.ValueInt64(),
-		Autoscaling_limit_min_cu: data.Project.Autoscaling_limit_min_cu.ValueInt64(),
-		Autoscaling_limit_max_cu: data.Project.Autoscaling_limit_max_cu.ValueInt64(),
+		Autoscaling_limit_min_cu: data.Project.AutoscalingLimitMinCu.ValueInt64(),
+		Autoscaling_limit_max_cu: data.Project.AutoscalingLimitMaxCu.ValueInt64(),
 	}
-	if !data.Project.DefaultEndpointSettings.PgSettings.IsUnknown() {
-		s := make(map[string]string)
-		for _, v := range data.Project.DefaultEndpointSettings.PgSettings.Elements() {
-			pg_settings := v.(types.Map)
-			for k, setting := range pg_settings.Elements() {
-				s[k] = setting.String()
-			}
-		}
-		content.Settings = endpointSettings{
-			"",
-			//data.DefaultEndpointSettings.Description.ValueString(),
-			s,
-		}
+	if data.Project.Settings != nil {
+		c.Settings = data.Project.Settings.ToEndpointSettingsJSON()
+	}
+	content := struct {
+		Project createProject `json:"project"`
+	}{
+		Project: c,
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -375,7 +325,7 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 		)
 		return
 	}
-	request, err := http.NewRequest("POST", "https://console.neon.tech/api/v2/projects/", bytes.NewBuffer(b))
+	request, err := http.NewRequest("POST", "https://console.neon.tech/api/v2/projects", bytes.NewBuffer(b))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create the request", err.Error())
 		return
@@ -383,20 +333,22 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 	request.Header.Add("Authorization", "Bearer "+key)
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
-	if err != nil || response.StatusCode != http.StatusOK {
+	if err != nil {
 		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusCreated {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
-	project := projectResourceModel{}
-	err = json.NewDecoder(response.Body).Decode(&project)
-	data = project
+	project := &projectResourceJSON{}
+	err = json.NewDecoder(response.Body).Decode(project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
 	//tflog.Trace(ctx, "created a resource")
-	diags = resp.State.Set(ctx, &data)
+	diags = resp.State.Set(ctx, project.ToProjectResourceModel())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -426,9 +378,12 @@ func (r projectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 	request.Header.Add("Authorization", "Bearer "+key)
-	_, err = r.client.Do(request)
+	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	resp.State.RemoveResource(ctx)
@@ -469,19 +424,21 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
-	project := projectResourceModel{}
-	err = json.NewDecoder(response.Body).Decode(&project)
-	data = project
+	project := &projectResourceJSON{}
+	err = json.NewDecoder(response.Body).Decode(project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
 	//tflog.Trace(ctx, "created a resource")
-	diags = resp.State.Set(ctx, &data)
+	diags = resp.State.Set(ctx, project.ToProjectResourceModel())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -496,10 +453,10 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 type updateProject struct {
-	Name                     string                         `tfsdk:"name"`
-	DefaultEndpointSettings  projectDefaultEndpointSettings `tfsdk:"default_endpoint_settings"`
-	Autoscaling_limit_min_cu int64                          `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64                          `json:"autoscaling_limit_max_cu,omitempty"`
+	Name                     string                `tfsdk:"name"`
+	Settings                 *endpointSettingsJSON `json:"default_endpoint_settings,omitempty"`
+	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
 }
 
 // Update implements resource.Resource
@@ -512,23 +469,18 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	content := updateProject{
-		Autoscaling_limit_min_cu: data.Project.Autoscaling_limit_min_cu.ValueInt64(),
-		Autoscaling_limit_max_cu: data.Project.Autoscaling_limit_max_cu.ValueInt64(),
+	u := updateProject{
+		Autoscaling_limit_min_cu: data.Project.AutoscalingLimitMinCu.ValueInt64(),
+		Autoscaling_limit_max_cu: data.Project.AutoscalingLimitMaxCu.ValueInt64(),
 		Name:                     data.Project.Name.ValueString(),
 	}
-	if !data.Project.DefaultEndpointSettings.PgSettings.IsUnknown() {
-		/*s := make(map[string]string)
-		for _, v := range data.Settings.PgSettings.Elements() {
-			pg_settings := v.(types.Map)
-			for k, setting := range pg_settings.Elements() {
-				s[k] = setting.String()
-			}
-		}
-		content.Settings = endpointSettings{
-			data.Settings.Description.ValueString(),
-			s,
-		}*/
+	if data.Project.Settings != nil {
+		u.Settings = data.Project.Settings.ToEndpointSettingsJSON()
+	}
+	content := struct {
+		Project updateProject `json:"project"`
+	}{
+		Project: u,
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -552,19 +504,22 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	request.Header.Add("Authorization", "Bearer "+key)
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
-	if err != nil || response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to update endpoint", err.Error())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
-	project := projectResourceModel{}
-	err = json.NewDecoder(response.Body).Decode(&project)
-	data = project
+	project := &projectResourceJSON{}
+	err = json.NewDecoder(response.Body).Decode(project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, &data)
+	//tflog.Trace(ctx, "created a resource")
+	diags = resp.State.Set(ctx, project.ToProjectResourceModel())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
