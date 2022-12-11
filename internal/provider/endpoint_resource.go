@@ -168,9 +168,9 @@ func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest
 		Disabled:                 data.Disabled.ValueBool(),
 		Passwordless_access:      data.PasswordlessAccess.ValueBool(),
 	}
-	if data.Settings != nil {
+	/*if data.Settings != nil {
 		content.Settings = data.Settings.ToEndpointSettingsJSON()
-	}
+	}*/
 	b, err := json.Marshal(content)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal endpoint", err.Error())
@@ -305,9 +305,9 @@ func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest
 		Disabled:                 data.Disabled.ValueBool(),
 		Passwordless_access:      data.PasswordlessAccess.ValueBool(),
 	}
-	if !data.Settings.Description.IsUnknown() {
+	/*if !data.Settings.Description.IsUnknown() {
 		content.Settings = data.Settings.ToEndpointSettingsJSON()
-	}
+	}*/
 	b, err := json.Marshal(content)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal endpoint", err.Error())

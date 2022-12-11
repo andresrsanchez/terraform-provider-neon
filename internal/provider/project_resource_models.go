@@ -1,8 +1,12 @@
 package provider
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -40,17 +44,16 @@ type projectConnUrisJSON struct {
 }
 
 type endpointSettingsJSON struct {
-	Description string            `json:"description"`
-	PgSettings  map[string]string `json:"pg_settings"`
+	PgSettings map[string]string `json:"pg_settings"`
 }
-type innerProjectJSON struct {
+type innerProjectResourcejson struct {
 	MaintenanceStartsAt   string                `json:"maintenance_starts_at"`
 	ID                    string                `json:"id"`
 	PlatformID            string                `json:"platform_id"`
 	RegionID              string                `json:"region_id"`
 	Name                  string                `json:"name"`
 	Provisioner           string                `json:"provisioner"`
-	Settings              *endpointSettingsJSON `json:"default_endpoint_settings"`
+	Settings              *endpointSettingsJSON `json:"settings"`
 	PgVersion             int64                 `json:"pg_version"`
 	AutoscalingLimitMinCu int64                 `json:"autoscaling_limit_min_cu"`
 	AutoscalingLimitMaxCu int64                 `json:"autoscaling_limit_max_cu"`
@@ -59,12 +62,12 @@ type innerProjectJSON struct {
 	UpdatedAt             string                `json:"updated_at"`
 }
 type projectResourceJSON struct {
-	Project        innerProjectJSON       `json:"project"`
-	ConnectionUris []projectConnUrisJSON  `json:"connection_uris"`
-	Roles          []roleResourceJSON     `json:"roles"`
-	Databases      []databaseResourceJSON `json:"databases"`
-	Branch         *branchResourceJSON    `json:"branch"`
-	Endpoints      []endpointResourceJSON `json:"endpoints"`
+	Project        innerProjectResourcejson `json:"project"`
+	ConnectionUris []projectConnUrisJSON    `json:"connection_uris"`
+	Roles          []roleResourceJSON       `json:"roles"`
+	Databases      []databaseResourceJSON   `json:"databases"`
+	Branch         *branchResourceJSON      `json:"branch"`
+	Endpoints      []endpointResourceJSON   `json:"endpoints"`
 }
 
 type roleResourceModel struct {
@@ -98,55 +101,66 @@ type projectConnUris struct {
 }
 
 type endpointSettingsModel struct {
-	Description types.String `tfsdk:"description"`
-	PgSettings  types.Map    `tfsdk:"pg_settings"`
-}
-type innerProjectModel struct {
-	MaintenanceStartsAt   types.String           `tfsdk:"maintenance_starts_at"`
-	ID                    types.String           `tfsdk:"id"`
-	PlatformID            types.String           `tfsdk:"platform_id"`
-	RegionID              types.String           `tfsdk:"region_id"`
-	Name                  types.String           `tfsdk:"name"`
-	Provisioner           types.String           `tfsdk:"provisioner"`
-	Settings              *endpointSettingsModel `tfsdk:"default_endpoint_settings"`
-	PgVersion             types.Int64            `tfsdk:"pg_version"`
-	AutoscalingLimitMinCu types.Int64            `tfsdk:"autoscaling_limit_min_cu"`
-	AutoscalingLimitMaxCu types.Int64            `tfsdk:"autoscaling_limit_max_cu"`
-	LastActive            types.String           `tfsdk:"last_active"`
-	CreatedAt             types.String           `tfsdk:"created_at"`
-	UpdatedAt             types.String           `tfsdk:"updated_at"`
+	//Description types.String `tfsdk:"description"`
+	PgSettings types.Map `tfsdk:"pg_settings"`
 }
 type projectResourceModel struct {
-	Project        innerProjectModel       `tfsdk:"project"`
-	ConnectionUris []projectConnUris       `tfsdk:"connection_uris"`
-	Roles          []roleResourceModel     `tfsdk:"roles"`
-	Databases      []databaseResourceModel `tfsdk:"databases"`
-	Branch         *branchResourceModel    `tfsdk:"branch"`
-	Endpoints      []endpointResourceModel `tfsdk:"endpoints"`
+	MaintenanceStartsAt types.String `tfsdk:"maintenance_starts_at"`
+	ID                  types.String `tfsdk:"id"`
+	PlatformID          types.String `tfsdk:"platform_id"`
+	RegionID            types.String `tfsdk:"region_id"`
+	Name                types.String `tfsdk:"name"`
+	Provisioner         types.String `tfsdk:"provisioner"`
+	//Settings              types.Object `tfsdk:"settings"`
+	PgVersion             types.Int64  `tfsdk:"pg_version"`
+	AutoscalingLimitMinCu types.Int64  `tfsdk:"autoscaling_limit_min_cu"`
+	AutoscalingLimitMaxCu types.Int64  `tfsdk:"autoscaling_limit_max_cu"`
+	LastActive            types.String `tfsdk:"last_active"`
+	CreatedAt             types.String `tfsdk:"created_at"`
+	UpdatedAt             types.String `tfsdk:"updated_at"`
+	ConnectionUris        types.List   `tfsdk:"connection_uris"`
+	Roles                 types.List   `tfsdk:"roles"`
+	Databases             types.List   `tfsdk:"databases"`
+	Branch                types.Object `tfsdk:"branch"`
+	Endpoints             types.List   `tfsdk:"endpoints"`
 }
 
-func (p *projectResourceJSON) ToProjectResourceModel() *projectResourceModel {
-	m := &projectResourceModel{
-		Project: innerProjectModel{
-			MaintenanceStartsAt:   types.StringValue(p.Project.MaintenanceStartsAt),
-			ID:                    types.StringValue(p.Project.ID),
-			PlatformID:            types.StringValue(p.Project.PlatformID),
-			RegionID:              types.StringValue(p.Project.RegionID),
-			Name:                  types.StringValue(p.Project.Name),
-			Provisioner:           types.StringValue(p.Project.Provisioner),
-			PgVersion:             types.Int64Value(p.Project.PgVersion),
-			AutoscalingLimitMinCu: types.Int64Value(p.Project.AutoscalingLimitMinCu),
-			AutoscalingLimitMaxCu: types.Int64Value(p.Project.AutoscalingLimitMaxCu),
-			LastActive:            types.StringValue(p.Project.LastActive),
-			CreatedAt:             types.StringValue(p.Project.CreatedAt),
-			UpdatedAt:             types.StringValue(p.Project.UpdatedAt),
-		},
+func newProjectResourceModel() projectResourceModel {
+	return projectResourceModel{
+		//Settings:       types.ObjectNull(typeFromAttrs(defaultSettingsResourceAttr())),
+		ConnectionUris: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}),
+		Roles:          types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}),
+		Databases:      types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}),
+		Branch:         types.ObjectNull(typeFromAttrs(branchResourceAttr())),
+		Endpoints:      types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}),
 	}
-	if p.Project.Settings != nil {
-		m.Project.Settings = p.Project.Settings.ToEndpointSettingsModel()
-	}
+}
+
+func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
+	m := newProjectResourceModel()
+	m.MaintenanceStartsAt = types.StringValue(p.Project.MaintenanceStartsAt)
+	m.ID = types.StringValue(p.Project.ID)
+	m.PlatformID = types.StringValue(p.Project.PlatformID)
+	m.RegionID = types.StringValue(p.Project.RegionID)
+	m.Name = types.StringValue(p.Project.Name)
+	m.Provisioner = types.StringValue(p.Project.Provisioner)
+	m.PgVersion = types.Int64Value(p.Project.PgVersion)
+	m.AutoscalingLimitMinCu = types.Int64Value(p.Project.AutoscalingLimitMinCu)
+	m.AutoscalingLimitMaxCu = types.Int64Value(p.Project.AutoscalingLimitMaxCu)
+	m.LastActive = types.StringValue(p.Project.LastActive)
+	m.CreatedAt = types.StringValue(p.Project.CreatedAt)
+	m.UpdatedAt = types.StringValue(p.Project.UpdatedAt)
+
+	/*if p.Settings != nil {
+		pg, _ := types.MapValueFrom(context.TODO(), types.StringType, p.Settings.PgSettings)
+		settings := endpointSettingsModel{
+			PgSettings: pg,
+		}
+		aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(defaultSettingsResourceAttr()), settings)
+		m.Settings = aux
+	}*/
 	if p.Branch != nil {
-		m.Branch = &branchResourceModel{
+		branch := branchResourceModel{
 			ID:           types.StringValue(p.Branch.ID),
 			ProjectID:    types.StringValue(p.Branch.ProjectID),
 			ParentID:     types.StringValue(p.Branch.ParentID),
@@ -156,19 +170,23 @@ func (p *projectResourceJSON) ToProjectResourceModel() *projectResourceModel {
 			CreatedAt:    types.StringValue(p.Branch.CreatedAt),
 			UpdatedAt:    types.StringValue(p.Branch.UpdatedAt),
 		}
+		aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(branchResourceAttr()), branch)
+		m.Branch = aux
 	}
 	if len(p.ConnectionUris) != 0 {
-		m.ConnectionUris = []projectConnUris{}
+		c := []projectConnUris{}
 		for _, v := range p.ConnectionUris {
-			m.ConnectionUris = append(m.ConnectionUris, projectConnUris{
+			c = append(c, projectConnUris{
 				ConnectionURI: types.StringValue(v.ConnectionURI),
 			})
 		}
+		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}, c)
+		m.ConnectionUris = aux
 	}
 	if len(p.Roles) != 0 {
-		m.Roles = []roleResourceModel{}
+		r := []roleResourceModel{}
 		for _, v := range p.Roles {
-			m.Roles = append(m.Roles, roleResourceModel{
+			r = append(r, roleResourceModel{
 				BranchID:  types.StringValue(v.BranchID),
 				Name:      types.StringValue(v.Name),
 				Password:  types.StringValue(v.Password),
@@ -177,11 +195,13 @@ func (p *projectResourceJSON) ToProjectResourceModel() *projectResourceModel {
 				UpdatedAt: types.StringValue(v.UpdatedAt),
 			})
 		}
+		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
+		m.Roles = aux
 	}
 	if len(p.Databases) != 0 {
-		m.Databases = []databaseResourceModel{}
+		d := []databaseResourceModel{}
 		for _, v := range p.Databases {
-			m.Databases = append(m.Databases, databaseResourceModel{
+			d = append(d, databaseResourceModel{
 				ID:        types.Int64Value(v.ID),
 				BranchID:  types.StringValue(v.BranchID),
 				Name:      types.StringValue(v.Name),
@@ -190,58 +210,82 @@ func (p *projectResourceJSON) ToProjectResourceModel() *projectResourceModel {
 				UpdatedAt: types.StringValue(v.UpdatedAt),
 			})
 		}
+		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
+		m.Databases = aux
 	}
 	if len(p.Endpoints) != 0 {
-		m.Endpoints = []endpointResourceModel{}
+		e := []endpointResourceModel{}
 		for _, v := range p.Endpoints {
-			m.Endpoints = append(m.Endpoints, *v.ToEndpointResourceModel())
+			ee := *v.ToEndpointResourceModel()
+			e = append(e, ee)
 		}
+		aux, diag := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
+		fmt.Printf("errors %v and warnings %v", diag.ErrorsCount(), diag.WarningsCount())
+		fmt.Println("")
+		fmt.Printf("%+v\n", diag.Errors())
+
+		m.Endpoints = aux
 	}
 	return m
 }
-func (m *projectResourceModel) ToProjectResourceJSON() *projectResourceJSON {
-	p := &projectResourceJSON{
-		Project: innerProjectJSON{
-			MaintenanceStartsAt:   m.Project.MaintenanceStartsAt.ValueString(),
-			ID:                    m.Project.ID.ValueString(),
-			PlatformID:            m.Project.PlatformID.ValueString(),
-			RegionID:              m.Project.RegionID.ValueString(),
-			Name:                  m.Project.Name.ValueString(),
-			Provisioner:           m.Project.Provisioner.ValueString(),
-			PgVersion:             m.Project.PgVersion.ValueInt64(),
-			AutoscalingLimitMinCu: m.Project.AutoscalingLimitMinCu.ValueInt64(),
-			AutoscalingLimitMaxCu: m.Project.AutoscalingLimitMaxCu.ValueInt64(),
-			LastActive:            m.Project.LastActive.ValueString(),
-			CreatedAt:             m.Project.CreatedAt.ValueString(),
-			UpdatedAt:             m.Project.UpdatedAt.ValueString(),
+func typeFromAttrs(in map[string]schema.Attribute) map[string]attr.Type {
+	out := map[string]attr.Type{}
+	for k, v := range in {
+		out[k] = v.GetType()
+	}
+	return out
+}
+func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
+	p := projectResourceJSON{
+		Project: innerProjectResourcejson{
+			MaintenanceStartsAt:   m.MaintenanceStartsAt.ValueString(),
+			ID:                    m.ID.ValueString(),
+			PlatformID:            m.PlatformID.ValueString(),
+			RegionID:              m.RegionID.ValueString(),
+			Name:                  m.Name.ValueString(),
+			Provisioner:           m.Provisioner.ValueString(),
+			PgVersion:             m.PgVersion.ValueInt64(),
+			AutoscalingLimitMinCu: m.AutoscalingLimitMinCu.ValueInt64(),
+			AutoscalingLimitMaxCu: m.AutoscalingLimitMaxCu.ValueInt64(),
+			LastActive:            m.LastActive.ValueString(),
+			CreatedAt:             m.CreatedAt.ValueString(),
+			UpdatedAt:             m.UpdatedAt.ValueString(),
 		},
 	}
-	if m.Project.Settings != nil {
-		p.Project.Settings = m.Project.Settings.ToEndpointSettingsJSON()
-	}
-	if m.Branch != nil {
+	/*if !m.Settings.IsNull() {
+		v := endpointSettingsModel{}
+		m.Settings.As(context.TODO(), &v, types.ObjectAsOptions{})
+		p.Settings = v.ToEndpointSettingsJSON()
+	}*/
+	if !m.Branch.IsNull() {
+		v := branchResourceModel{}
+		m.Branch.As(context.TODO(), &v, types.ObjectAsOptions{})
 		p.Branch = &branchResourceJSON{
-			ID:           m.Branch.ID.ValueString(),
-			ProjectID:    m.Branch.ProjectID.ValueString(),
-			ParentID:     m.Branch.ParentID.ValueString(),
-			ParentLsn:    m.Branch.ParentLsn.ValueString(),
-			Name:         m.Branch.Name.ValueString(),
-			CurrentState: m.Branch.CurrentState.ValueString(),
-			CreatedAt:    m.Branch.CreatedAt.ValueString(),
-			UpdatedAt:    m.Branch.UpdatedAt.ValueString(),
+			ID:           v.ID.ValueString(),
+			ProjectID:    v.ProjectID.ValueString(),
+			ParentID:     v.ParentID.ValueString(),
+			ParentLsn:    v.ParentLsn.ValueString(),
+			Name:         v.Name.ValueString(),
+			CurrentState: v.CurrentState.ValueString(),
+			CreatedAt:    v.CreatedAt.ValueString(),
+			UpdatedAt:    v.UpdatedAt.ValueString(),
 		}
 	}
-	if len(m.ConnectionUris) != 0 {
+	if !m.ConnectionUris.IsNull() {
 		p.ConnectionUris = []projectConnUrisJSON{}
-		for _, v := range m.ConnectionUris {
+		for _, vv := range m.ConnectionUris.Elements() {
+			v := projectConnUris{}
+			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
 			p.ConnectionUris = append(p.ConnectionUris, projectConnUrisJSON{
 				ConnectionURI: v.ConnectionURI.ValueString(),
 			})
 		}
 	}
-	if len(m.Roles) != 0 {
+	if !m.Roles.IsNull() {
 		p.Roles = []roleResourceJSON{}
-		for _, v := range m.Roles {
+		for _, vv := range m.Roles.Elements() {
+			v := roleResourceModel{}
+			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
 			p.Roles = append(p.Roles, roleResourceJSON{
 				BranchID:  v.BranchID.ValueString(),
 				Name:      v.Name.ValueString(),
@@ -252,9 +296,11 @@ func (m *projectResourceModel) ToProjectResourceJSON() *projectResourceJSON {
 			})
 		}
 	}
-	if len(m.Databases) != 0 {
+	if !m.Databases.IsNull() {
 		p.Databases = []databaseResourceJSON{}
-		for _, v := range m.Databases {
+		for _, vv := range m.Databases.Elements() {
+			v := databaseResourceModel{}
+			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
 			p.Databases = append(p.Databases, databaseResourceJSON{
 				ID:        v.ID.ValueInt64(),
 				BranchID:  v.BranchID.ValueString(),
@@ -265,9 +311,11 @@ func (m *projectResourceModel) ToProjectResourceJSON() *projectResourceJSON {
 			})
 		}
 	}
-	if len(m.Endpoints) != 0 {
+	if m.Endpoints.IsNull() {
 		p.Endpoints = []endpointResourceJSON{}
-		for _, v := range m.Endpoints {
+		for _, vv := range m.Endpoints.Elements() {
+			v := endpointResourceModel{}
+			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
 			p.Endpoints = append(p.Endpoints, *v.ToEndpointResourceJSON())
 		}
 	}

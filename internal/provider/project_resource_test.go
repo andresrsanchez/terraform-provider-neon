@@ -14,9 +14,14 @@ func TestProjectResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
+				//Destroy: true,
 				Config: testNeonProjectResourceBasic(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("neon_project.test", "name", "name"),
+					resource.TestCheckResourceAttr("neon_project.test", "provisioner", "k8s-pod"),
+					resource.TestCheckResourceAttr("neon_project.test", "region_id", "aws-us-east-2"),
+					resource.TestCheckResourceAttr("neon_project.test", "pg_version", "14"),
+					//resource.TestCheckResourceAttr("neon_project.test", "settings", "name"),
 				),
 			},
 			// ImportState testing
@@ -45,12 +50,20 @@ func TestProjectResource(t *testing.T) {
 func testNeonProjectResourceBasic() string {
 	return fmt.Sprintf(`
 resource "neon_project" "test" {
-	project {
-		name = "name"
-	}
+	name = "name"
+	provisioner = "k8s-pod"
+	region_id = "aws-us-east-2"
+	pg_version = 14	
 }
 `)
 }
+
+//	Provisioner              string                `json:"provisioner,omitempty"`
+//	RegionID                 string                `json:"region_id,omitempty"`
+//	PgVersion                int64                 `json:"pg_version,omitempty"`
+//	Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
+//	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
+//	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
 
 /*func testNeonProjectResourceComplex_1() string {
 	return `
