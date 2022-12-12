@@ -2,17 +2,12 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type projectResource struct {
-	client *http.Client
-}
 type roleResourceJSON struct {
 	BranchID  string `json:"branch_id"`
 	Name      string `json:"name"`
@@ -29,16 +24,7 @@ type databaseResourceJSON struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
-type branchResourceJSON struct {
-	ID           string `json:"id"`
-	ProjectID    string `json:"project_id"`
-	ParentID     string `json:"parent_id"`
-	ParentLsn    string `json:"parent_lsn"`
-	Name         string `json:"name"`
-	CurrentState string `json:"current_state"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
-}
+
 type projectConnUrisJSON struct {
 	ConnectionURI string `json:"connection_uri"`
 }
@@ -46,7 +32,7 @@ type projectConnUrisJSON struct {
 type endpointSettingsJSON struct {
 	PgSettings map[string]string `json:"pg_settings"`
 }
-type innerProjectResourcejson struct {
+type innerProjectResourceJSON struct {
 	MaintenanceStartsAt   string                `json:"maintenance_starts_at"`
 	ID                    string                `json:"id"`
 	PlatformID            string                `json:"platform_id"`
@@ -62,7 +48,7 @@ type innerProjectResourcejson struct {
 	UpdatedAt             string                `json:"updated_at"`
 }
 type projectResourceJSON struct {
-	Project        innerProjectResourcejson `json:"project"`
+	Project        innerProjectResourceJSON `json:"project"`
 	ConnectionUris []projectConnUrisJSON    `json:"connection_uris"`
 	Roles          []roleResourceJSON       `json:"roles"`
 	Databases      []databaseResourceJSON   `json:"databases"`
@@ -86,17 +72,8 @@ type databaseResourceModel struct {
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
-type branchResourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	ProjectID    types.String `tfsdk:"project_id"`
-	ParentID     types.String `tfsdk:"parent_id"`
-	ParentLsn    types.String `tfsdk:"parent_lsn"`
-	Name         types.String `tfsdk:"name"`
-	CurrentState types.String `tfsdk:"current_state"`
-	CreatedAt    types.String `tfsdk:"created_at"`
-	UpdatedAt    types.String `tfsdk:"updated_at"`
-}
-type projectConnUris struct {
+
+type projectConnUrisModel struct {
 	ConnectionURI types.String `tfsdk:"connection_uri"`
 }
 
@@ -160,23 +137,13 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 		m.Settings = aux
 	}*/
 	if p.Branch != nil {
-		branch := branchResourceModel{
-			ID:           types.StringValue(p.Branch.ID),
-			ProjectID:    types.StringValue(p.Branch.ProjectID),
-			ParentID:     types.StringValue(p.Branch.ParentID),
-			ParentLsn:    types.StringValue(p.Branch.ParentLsn),
-			Name:         types.StringValue(p.Branch.Name),
-			CurrentState: types.StringValue(p.Branch.CurrentState),
-			CreatedAt:    types.StringValue(p.Branch.CreatedAt),
-			UpdatedAt:    types.StringValue(p.Branch.UpdatedAt),
-		}
-		aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(branchResourceAttr()), branch)
+		aux := toBranchModel(p.Branch)
 		m.Branch = aux
 	}
 	if len(p.ConnectionUris) != 0 {
-		c := []projectConnUris{}
+		c := []projectConnUrisModel{}
 		for _, v := range p.ConnectionUris {
-			c = append(c, projectConnUris{
+			c = append(c, projectConnUrisModel{
 				ConnectionURI: types.StringValue(v.ConnectionURI),
 			})
 		}
@@ -219,11 +186,7 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 			ee := *v.ToEndpointResourceModel()
 			e = append(e, ee)
 		}
-		aux, diag := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
-		fmt.Printf("errors %v and warnings %v", diag.ErrorsCount(), diag.WarningsCount())
-		fmt.Println("")
-		fmt.Printf("%+v\n", diag.Errors())
-
+		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
 		m.Endpoints = aux
 	}
 	return m
@@ -237,7 +200,7 @@ func typeFromAttrs(in map[string]schema.Attribute) map[string]attr.Type {
 }
 func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 	p := projectResourceJSON{
-		Project: innerProjectResourcejson{
+		Project: innerProjectResourceJSON{
 			MaintenanceStartsAt:   m.MaintenanceStartsAt.ValueString(),
 			ID:                    m.ID.ValueString(),
 			PlatformID:            m.PlatformID.ValueString(),
@@ -258,23 +221,13 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	if !m.Branch.IsNull() {
-		v := branchResourceModel{}
-		m.Branch.As(context.TODO(), &v, types.ObjectAsOptions{})
-		p.Branch = &branchResourceJSON{
-			ID:           v.ID.ValueString(),
-			ProjectID:    v.ProjectID.ValueString(),
-			ParentID:     v.ParentID.ValueString(),
-			ParentLsn:    v.ParentLsn.ValueString(),
-			Name:         v.Name.ValueString(),
-			CurrentState: v.CurrentState.ValueString(),
-			CreatedAt:    v.CreatedAt.ValueString(),
-			UpdatedAt:    v.UpdatedAt.ValueString(),
-		}
+		aux := toBranchJSON(&m.Branch)
+		p.Branch = aux
 	}
 	if !m.ConnectionUris.IsNull() {
 		p.ConnectionUris = []projectConnUrisJSON{}
 		for _, vv := range m.ConnectionUris.Elements() {
-			v := projectConnUris{}
+			v := projectConnUrisModel{}
 			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
 			p.ConnectionUris = append(p.ConnectionUris, projectConnUrisJSON{
 				ConnectionURI: v.ConnectionURI.ValueString(),

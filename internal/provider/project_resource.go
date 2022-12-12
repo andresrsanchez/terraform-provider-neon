@@ -17,6 +17,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type projectResource struct {
+	client *http.Client
+}
+
 var _ resource.Resource = projectResource{}
 var _ resource.ResourceWithImportState = projectResource{}
 
@@ -71,34 +75,7 @@ func databaseResourceAttr() map[string]schema.Attribute {
 		},
 	}
 }
-func branchResourceAttr() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"id": schema.StringAttribute{
-			Computed: true,
-		},
-		"project_id": schema.StringAttribute{
-			Computed: true,
-		},
-		"parent_id": schema.StringAttribute{
-			Computed: true,
-		},
-		"parent_lsn": schema.StringAttribute{
-			Computed: true,
-		},
-		"name": schema.StringAttribute{
-			Computed: true,
-		},
-		"current_state": schema.StringAttribute{
-			Computed: true,
-		},
-		"created_at": schema.StringAttribute{
-			Computed: true,
-		},
-		"updated_at": schema.StringAttribute{
-			Computed: true,
-		},
-	}
-}
+
 func connectionUriResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"connection_uri": schema.StringAttribute{
@@ -120,95 +97,7 @@ func defaultSettingsResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func endpointResourceAttr() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"host": schema.StringAttribute{
-			MarkdownDescription: "neon host",
-			Computed:            true,
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "endpoint id",
-			Computed:            true,
-		},
-		"project_id": schema.StringAttribute{
-			MarkdownDescription: "project id",
-			Computed:            true,
-		},
-		"branch_id": schema.StringAttribute{
-			MarkdownDescription: "postgres branch",
-			Computed:            true,
-		},
-		"autoscaling_limit_min_cu": schema.Int64Attribute{
-			MarkdownDescription: "autoscaling limit min",
-			Computed:            true,
-		},
-		"autoscaling_limit_max_cu": schema.Int64Attribute{
-			MarkdownDescription: "autoscaling limit max",
-			Computed:            true,
-		},
-		"region_id": schema.StringAttribute{
-			MarkdownDescription: "region id",
-			Computed:            true,
-		},
-		"type": schema.StringAttribute{
-			MarkdownDescription: "type",
-			Required:            true,
-			Validators:          []validator.String{stringvalidator.OneOf("read_write", "read_only")},
-		},
-		"current_state": schema.StringAttribute{
-			MarkdownDescription: "current state",
-			Computed:            true,
-			Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
-		},
-		"pending_state": schema.StringAttribute{
-			MarkdownDescription: "pending state",
-			Computed:            true,
-			Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
-		},
-		/*"settings": schema.ObjectAttribute{
-			AttributeTypes: map[string]attr.Type{
-				"description": types.StringType,
-				"pg_settings": types.ListType{
-					ElemType: types.MapType{
-						ElemType: types.StringType,
-					},
-				},
-			},
-			Computed: true,
-		},*/
-		"pooler_enabled": schema.BoolAttribute{
-			MarkdownDescription: "pooler enabled",
-			Computed:            true,
-		},
-		"pooler_mode": schema.StringAttribute{
-			MarkdownDescription: "pooler mode",
-			Computed:            true,
-			Validators:          []validator.String{stringvalidator.OneOf("transaction")},
-		},
-		"disabled": schema.BoolAttribute{
-			MarkdownDescription: "disabled",
-			Computed:            true,
-		},
-		"passwordless_access": schema.BoolAttribute{
-			MarkdownDescription: "passwordless access",
-			Computed:            true,
-		},
-		//validate dates
-		"last_active": schema.StringAttribute{
-			MarkdownDescription: "last active",
-			Computed:            true,
-		},
-		"created_at": schema.StringAttribute{
-			MarkdownDescription: "created at",
-			Computed:            true,
-		},
-		"updated_at": schema.StringAttribute{
-			MarkdownDescription: "updated at",
-			Computed:            true,
-		},
-	}
-}
-
+//migrate to projectattrs()
 func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{

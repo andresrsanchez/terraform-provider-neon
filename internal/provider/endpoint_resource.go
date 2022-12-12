@@ -9,12 +9,10 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ resource.Resource = endpointResource{}
@@ -37,100 +35,95 @@ func (r endpointResource) Metadata(ctx context.Context, req resource.MetadataReq
 func (r endpointResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Neon endpoint resource",
+		Attributes:          endpointResourceAttr(),
+	}
+}
 
-		Attributes: map[string]schema.Attribute{
-			"host": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "endpoint id",
-				Computed:            true,
-			},
-			"project_id": schema.StringAttribute{
-				MarkdownDescription: "project id",
-				Required:            true,
-			},
-			"branch_id": schema.StringAttribute{
-				MarkdownDescription: "postgres branch",
-				Required:            true,
-			},
-			"autoscaling_limit_min_cu": schema.Int64Attribute{
-				MarkdownDescription: "autoscaling limit min",
-				Computed:            true,
-				Optional:            true,
-			},
-			"autoscaling_limit_max_cu": schema.Int64Attribute{
-				MarkdownDescription: "autoscaling limit max",
-				Computed:            true,
-				Optional:            true,
-			},
-			"region_id": schema.StringAttribute{
-				MarkdownDescription: "region id",
-				Computed:            true,
-				Optional:            true,
-			},
-			"type": schema.StringAttribute{
-				MarkdownDescription: "type",
-				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("read_write", "read_only")},
-			},
-			"current_state": schema.StringAttribute{
-				MarkdownDescription: "current state",
-				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
-			},
-			"pending_state": schema.StringAttribute{
-				MarkdownDescription: "pending state",
-				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
-			},
-			"settings": schema.ObjectAttribute{
-				AttributeTypes: map[string]attr.Type{
-					"description": types.StringType,
-					"pg_settings": types.ListType{
-						ElemType: types.MapType{
-							ElemType: types.StringType,
-						},
+func endpointResourceAttr() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"host": schema.StringAttribute{
+			MarkdownDescription: "neon host",
+			Computed:            true,
+		},
+		"id": schema.StringAttribute{
+			MarkdownDescription: "endpoint id",
+			Computed:            true,
+		},
+		"project_id": schema.StringAttribute{
+			MarkdownDescription: "project id",
+			Computed:            true,
+		},
+		"branch_id": schema.StringAttribute{
+			MarkdownDescription: "postgres branch",
+			Computed:            true,
+		},
+		"autoscaling_limit_min_cu": schema.Int64Attribute{
+			MarkdownDescription: "autoscaling limit min",
+			Computed:            true,
+		},
+		"autoscaling_limit_max_cu": schema.Int64Attribute{
+			MarkdownDescription: "autoscaling limit max",
+			Computed:            true,
+		},
+		"region_id": schema.StringAttribute{
+			MarkdownDescription: "region id",
+			Computed:            true,
+		},
+		"type": schema.StringAttribute{
+			MarkdownDescription: "type",
+			Required:            true,
+			Validators:          []validator.String{stringvalidator.OneOf("read_write", "read_only")},
+		},
+		"current_state": schema.StringAttribute{
+			MarkdownDescription: "current state",
+			Computed:            true,
+			Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
+		},
+		"pending_state": schema.StringAttribute{
+			MarkdownDescription: "pending state",
+			Computed:            true,
+			Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
+		},
+		/*"settings": schema.ObjectAttribute{
+			AttributeTypes: map[string]attr.Type{
+				"description": types.StringType,
+				"pg_settings": types.ListType{
+					ElemType: types.MapType{
+						ElemType: types.StringType,
 					},
 				},
-				Computed: true,
-				Optional: true,
 			},
-			"pooler_enabled": schema.BoolAttribute{
-				MarkdownDescription: "pooler enabled",
-				Computed:            true,
-				Optional:            true,
-			},
-			"pooler_mode": schema.StringAttribute{
-				MarkdownDescription: "pooler mode",
-				Computed:            true,
-				Optional:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("transaction")},
-			},
-			"disabled": schema.BoolAttribute{
-				MarkdownDescription: "disabled",
-				Computed:            true,
-				Optional:            true,
-			},
-			"passwordless_access": schema.BoolAttribute{
-				MarkdownDescription: "passwordless access",
-				Computed:            true,
-				Optional:            true,
-			},
-			//validate dates
-			"last_active": schema.StringAttribute{
-				MarkdownDescription: "last active",
-				Computed:            true,
-			},
-			"created_at": schema.StringAttribute{
-				MarkdownDescription: "created at",
-				Computed:            true,
-			},
-			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "updated at",
-				Computed:            true,
-			},
+			Computed: true,
+		},*/
+		"pooler_enabled": schema.BoolAttribute{
+			MarkdownDescription: "pooler enabled",
+			Computed:            true,
+		},
+		"pooler_mode": schema.StringAttribute{
+			MarkdownDescription: "pooler mode",
+			Computed:            true,
+			Validators:          []validator.String{stringvalidator.OneOf("transaction")},
+		},
+		"disabled": schema.BoolAttribute{
+			MarkdownDescription: "disabled",
+			Computed:            true,
+		},
+		"passwordless_access": schema.BoolAttribute{
+			MarkdownDescription: "passwordless access",
+			Computed:            true,
+		},
+		//validate dates
+		"last_active": schema.StringAttribute{
+			MarkdownDescription: "last active",
+			Computed:            true,
+		},
+		"created_at": schema.StringAttribute{
+			MarkdownDescription: "created at",
+			Computed:            true,
+		},
+		"updated_at": schema.StringAttribute{
+			MarkdownDescription: "updated at",
+			Computed:            true,
 		},
 	}
 }
