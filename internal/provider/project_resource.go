@@ -282,7 +282,6 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 // Delete implements resource.Resource
 func (r projectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data projectResourceModel
-
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 
@@ -302,12 +301,11 @@ func (r projectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 	request.Header.Add("Authorization", "Bearer "+key)
 	response, err := r.client.Do(request)
-	fmt.Println(response.Status)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		resp.Diagnostics.AddError("Failed to delete project", err.Error())
 		return
 	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to delete project, response status ", response.Status)
 		return
 	}
 	resp.State.RemoveResource(ctx)

@@ -16,9 +16,8 @@ func TestBranchResource(t *testing.T) {
 			{
 				Config: testNeonBranchResourceBasic(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("neon_project.test", "name", "name"),
-					resource.TestCheckResourceAttr("neon_project.test", "provisioner", "k8s-pod"),
-					resource.TestCheckResourceAttr("neon_project.test", "region_id", "aws-us-east-2"),
+					resource.TestCheckResourceAttr("neon_project.test", "name", "name_project"),
+					resource.TestCheckResourceAttr("neon_branch.test", "name", "name_branch"),
 					resource.TestCheckResourceAttr("neon_project.test", "pg_version", "14"),
 				),
 			},

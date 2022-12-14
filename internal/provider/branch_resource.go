@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,7 +36,7 @@ type branchResourceJSON struct {
 	LogicalSizeLimit int64  `json:"logical_size_limit"`
 	PhysicalSize     int64  `json:"physical_size"`
 }
-type branchResourceModel struct {
+type BranchResourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	ProjectID        types.String `tfsdk:"project_id"`
 	ParentID         types.String `tfsdk:"parent_id"`
@@ -49,10 +51,12 @@ type branchResourceModel struct {
 	LogicalSizeLimit types.Int64  `tfsdk:"logical_size_limit"`
 	PhysicalSize     types.Int64  `tfsdk:"physical_size"`
 }
-type branchEndpointResourceModel struct {
-	Branch    types.Object `tfsdk:"branch"`
-	Endpoints types.List   `tfsdk:"endpoints"`
+type BranchEndpointResourceModel struct {
+	Type                  types.String `tfsdk:"type"`
+	AutoscalingLimitMinCu types.Int64  `tfsdk:"autoscaling_limit_min_cu"`
+	AutoscalingLimitMaxCu types.Int64  `tfsdk:"autoscaling_limit_max_cu"`
 }
+
 type branchEndpointResourceJSON struct {
 	Branch    branchResourceJSON `json:"branch"`
 	Endpoints []struct {
@@ -152,7 +156,7 @@ func branchEndpointResourceAttr() map[string]schema.Attribute {
 }
 
 func toBranchModel(in *branchResourceJSON) types.Object {
-	branch := branchResourceModel{
+	branch := BranchResourceModel{
 		ID:               types.StringValue(in.ID),
 		ProjectID:        types.StringValue(in.ProjectID),
 		ParentID:         types.StringValue(in.ParentID),
@@ -172,7 +176,7 @@ func toBranchModel(in *branchResourceJSON) types.Object {
 }
 
 func toBranchJSON(in *types.Object) *branchResourceJSON {
-	v := branchResourceModel{}
+	v := BranchResourceModel{}
 	in.As(context.TODO(), &v, types.ObjectAsOptions{})
 	return &branchResourceJSON{
 		ID:               v.ID.ValueString(),
@@ -209,23 +213,60 @@ type createBranchInnerEndpoint struct {
 	Autoscaling_limit_max_cu int64  `json:"autoscaling_limit_max_cu,omitempty"`
 }
 
+func newBranchResourceModel() BranchEndpointResourceModel {
+	return BranchEndpointResourceModel{
+		//Object:    types.ObjectNull(typeFromAttrs(branchResourceAttr())),
+		//Endpoints: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}),
+	}
+}
+
 func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data branchEndpointResourceModel
-	var branchModel branchResourceModel
-	fmt.Printf("%+v\n", req.Plan.Raw)
-	lul := types.ObjectNull(typeFromAttrs(branchEndpointResourceAttr()))
-	diags := req.Plan.Get(ctx, &lul)
+	time.Sleep(20 * time.Second) //fix
+	branchEndpointResourceRaw := types.ObjectNull(typeFromAttrs(branchEndpointResourceAttr()))
+	diags := req.Plan.Get(ctx, &branchEndpointResourceRaw)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	bs, _ := json.Marshal(lul.Attributes())
-	fmt.Println(string(bs))
-	bb := []createBranchInnerEndpoint{}
-	diags = data.Branch.As(ctx, branchModel, types.ObjectAsOptions{})
+	endpointModelRaw := map[string]attr.Value{
+		"endpoints": types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}),
+	}
+	branchModelRaw := map[string]attr.Value{}
+	for k, v := range branchEndpointResourceRaw.Attributes() {
+		if k == "endpoints" {
+			endpointModelRaw[k] = v
+		} else {
+			branchModelRaw[k] = v
+		}
+	}
+	branchObj, diags := types.ObjectValue(typeFromAttrs(branchResourceAttr()), branchModelRaw)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	var branchModel BranchResourceModel
+	diags = branchObj.As(ctx, &branchModel, types.ObjectAsOptions{})
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var endpointsModel1 []createBranchInnerEndpoint
+	if key, ok := endpointModelRaw["endpoints"]; ok && !key.IsUnknown() { //isunknown
+		var endpointsModel []BranchEndpointResourceModel
+		keyList := key.(types.List)
+		diags = keyList.ElementsAs(ctx, &endpointsModel, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		for _, v := range endpointsModel {
+			endpointsModel1 = append(endpointsModel1, createBranchInnerEndpoint{
+				Type:                     v.Type.ValueString(),
+				Autoscaling_limit_min_cu: v.AutoscalingLimitMinCu.ValueInt64(),
+				Autoscaling_limit_max_cu: v.AutoscalingLimitMaxCu.ValueInt64(),
+			})
+		}
 	}
 	content := struct {
 		Branch    createBranchInner           `json:"branch"`
@@ -237,14 +278,7 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 			Parent_lsn:       branchModel.ParentLsn.ValueString(),
 			Parent_timestamp: branchModel.ParentLsn.ValueString(),
 		},
-	}
-	if !data.Endpoints.IsNull() {
-		diags = data.Endpoints.ElementsAs(ctx, &bb, false)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		content.Endpoints = bb
+		Endpoints: endpointsModel1,
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -269,10 +303,10 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create branch", err.Error())
+		resp.Diagnostics.AddError("Failed to delete branch", err.Error())
 		return
 	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create branch, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to delete branch, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
@@ -282,15 +316,38 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	data = branchEndpointResourceModel{
-		Branch:    toBranchModel(&inner.Branch),
-		Endpoints: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchEndpointAttr())}),
+
+	branchObj = toBranchModel(&inner.Branch)
+	branchEndpointRawTypes := branchObj.AttributeTypes(ctx)
+	branchEndpointRawValues := branchObj.Attributes()
+	branchEndpointRawTypes["endpoints"] = types.ListType{
+		ElemType: types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())},
 	}
+	branchEndpointRawValues["endpoints"] = types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())})
+
 	if len(inner.Endpoints) > 0 {
-		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(branchEndpointAttr())}, inner.Endpoints)
-		data.Endpoints = aux
+		values := []BranchEndpointResourceModel{}
+		for _, v := range inner.Endpoints {
+			values = append(values, BranchEndpointResourceModel{
+				Type:                  types.StringValue(v.Type),
+				AutoscalingLimitMinCu: types.Int64Value(v.AutoscalingLimitMinCu),
+				AutoscalingLimitMaxCu: types.Int64Value(v.AutoscalingLimitMaxCu),
+			})
+		}
+		rawEndpoints, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, values)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		branchEndpointRawValues["endpoints"] = rawEndpoints
 	}
-	diags = resp.State.Set(ctx, data)
+
+	plan, diags := types.ObjectValue(branchEndpointRawTypes, branchEndpointRawValues)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -298,6 +355,46 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 }
 
 func (r branchResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var projectID, ID types.String
+	diags := req.State.GetAttribute(ctx, path.Root("project_id"), &projectID)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		fmt.Println("where is the project_id?")
+		return
+	}
+	diags = req.State.GetAttribute(ctx, path.Root("id"), &ID)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		fmt.Println("where is the id?")
+		return
+	}
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString())
+	request, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create the request", err.Error())
+		return
+	}
+	key, ok := os.LookupEnv("NEON_API_KEY")
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unable to find token",
+			"token cannot be an empty string",
+		)
+		return
+	}
+	request.Header.Add("Authorization", "Bearer "+key)
+	response, err := r.client.Do(request)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete branch", err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError("Failed to delete branch, response status ", response.Status)
+		return
+	}
+	resp.State.RemoveResource(ctx)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (r branchResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
