@@ -15,53 +15,53 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type databaseResource struct {
+type roleResource struct {
 	client *http.Client
 }
-type databaseResourceJSON struct {
-	ID        int64  `json:"id"`
-	BranchID  string `json:"branch_id"`
+type roleResourceJSON struct {
 	ProjectID string `json:"project_id"`
+	BranchID  string `json:"branch_id"`
 	Name      string `json:"name"`
-	OwnerName string `json:"owner_name"`
+	Password  string `json:"password"`
+	Protected bool   `json:"protected"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
-type databaseResourceModel struct {
-	ID        types.Int64  `tfsdk:"id"`
-	BranchID  types.String `tfsdk:"branch_id"`
+type roleResourceModel struct {
 	ProjectID types.String `tfsdk:"project_id"`
+	BranchID  types.String `tfsdk:"branch_id"`
 	Name      types.String `tfsdk:"name"`
-	OwnerName types.String `tfsdk:"owner_name"`
+	Password  types.String `tfsdk:"password"`
+	Protected types.Bool   `tfsdk:"protected"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
 
-var _ resource.Resource = databaseResource{}
-var _ resource.ResourceWithImportState = databaseResource{}
+var _ resource.Resource = roleResource{}
+var _ resource.ResourceWithImportState = roleResource{}
 
-func NewDatabaseResource() resource.Resource {
-	return databaseResource{
+func NewRoleResource() resource.Resource {
+	return roleResource{
 		client: &http.Client{},
 	}
 }
 
-func databaseResourceAttr() map[string]schema.Attribute {
+func roleResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"id": schema.Int64Attribute{
-			Computed: true,
-		},
 		"branch_id": schema.StringAttribute{
-			Required: true,
-		},
-		"project_id": schema.StringAttribute{
 			Required: true,
 		},
 		"name": schema.StringAttribute{
 			Required: true,
 		},
-		"owner_name": schema.StringAttribute{
-			Optional: true,
+		"project_id": schema.StringAttribute{
+			Required: true,
+		},
+		"password": schema.StringAttribute{
+			Computed: true,
+		},
+		"protected": schema.BoolAttribute{
+			Computed: true,
 		},
 		"created_at": schema.StringAttribute{
 			Computed: true,
@@ -72,63 +72,60 @@ func databaseResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toDatabaseJSON(v *types.Object) *databaseResourceJSON {
-	in := databaseResourceModel{}
-	v.As(context.TODO(), &in, types.ObjectAsOptions{})
-	return &databaseResourceJSON{
-		ID:        in.ID.ValueInt64(),
-		BranchID:  in.BranchID.ValueString(),
-		Name:      in.Name.ValueString(),
-		OwnerName: in.OwnerName.ValueString(),
-		CreatedAt: in.CreatedAt.ValueString(),
-		UpdatedAt: in.UpdatedAt.ValueString(),
+func toRoleJSON(in *types.Object) *roleResourceJSON {
+	v := roleResourceModel{}
+	in.As(context.TODO(), &in, types.ObjectAsOptions{})
+	return &roleResourceJSON{
+		BranchID:  v.BranchID.ValueString(),
+		Name:      v.Name.ValueString(),
+		Password:  v.Password.ValueString(),
+		Protected: v.Protected.ValueBool(),
+		CreatedAt: v.UpdatedAt.ValueString(),
+		UpdatedAt: v.UpdatedAt.ValueString(),
 	}
 }
 
-func toDatabaseModel(in *databaseResourceJSON) types.Object {
-	db := databaseResourceModel{
-		ID:        types.Int64Value(in.ID),
-		BranchID:  types.StringValue(in.BranchID),
-		Name:      types.StringValue(in.Name),
-		OwnerName: types.StringValue(in.OwnerName),
-		CreatedAt: types.StringValue(in.CreatedAt),
-		UpdatedAt: types.StringValue(in.UpdatedAt),
+func toRoleModel(v *roleResourceJSON) types.Object {
+	db := roleResourceModel{
+		BranchID:  types.StringValue(v.BranchID),
+		Name:      types.StringValue(v.Name),
+		Password:  types.StringValue(v.Password),
+		Protected: types.BoolValue(v.Protected),
+		CreatedAt: types.StringValue(v.CreatedAt),
+		UpdatedAt: types.StringValue(v.UpdatedAt),
 	}
 	aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(databaseResourceAttr()), db)
 	return aux
 }
 
-func (r databaseResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r roleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: databaseResourceAttr(),
 	}
 }
 
-func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r roleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	time.Sleep(20 * time.Second)
-	var data databaseResourceModel
+	var data roleResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	content := struct {
-		Database struct {
-			Name      string `json:"name"`
-			OwnerName string `json:"owner_name,omitempty"`
-		} `json:"database"`
+		Role struct {
+			Name string `json:"name"`
+		} `json:"role"`
 	}{
-		Database: struct {
-			Name      string `json:"name"`
-			OwnerName string `json:"owner_name,omitempty"`
+		Role: struct {
+			Name string `json:"name"`
 		}{
-			Name:      data.Name.ValueString(),
-			OwnerName: data.OwnerName.ValueString(),
+			Name: data.Name.ValueString(),
 		},
 	}
 	b, err := json.Marshal(content)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal project", err.Error())
+		resp.Diagnostics.AddError("Failed to marshal role", err.Error())
 		return
 	}
 	fmt.Println(string(b))
@@ -140,7 +137,7 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 		)
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/databases", data.ProjectID.ValueString(), data.BranchID.ValueString())
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles", data.ProjectID.ValueString(), data.BranchID.ValueString())
 	fmt.Println(url)
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
@@ -151,24 +148,24 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create database", err.Error())
+		resp.Diagnostics.AddError("Failed to create role", err.Error())
 		return
 	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create database, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to create role, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
 	inner := struct {
-		Database databaseResourceJSON `json:"database"`
+		Role roleResourceJSON `json:"role"`
 	}{
-		Database: databaseResourceJSON{},
+		Role: roleResourceJSON{},
 	}
 	err = json.NewDecoder(response.Body).Decode(&inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toDatabaseModel(&inner.Database))
+	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -176,14 +173,14 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 }
 
-func (r databaseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data databaseResourceModel
+func (r roleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data roleResourceModel
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
 	request, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create the request", err.Error())
@@ -200,10 +197,10 @@ func (r databaseResource) Delete(ctx context.Context, req resource.DeleteRequest
 	request.Header.Add("Authorization", "Bearer "+key)
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete branch", err.Error())
+		resp.Diagnostics.AddError("Failed to delete role", err.Error())
 		return
 	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to delete branch, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to delete role, response status ", response.Status)
 		return
 	}
 	resp.State.RemoveResource(ctx)
@@ -212,18 +209,18 @@ func (r databaseResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-func (r databaseResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_database"
+func (r roleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_role"
 }
 
-func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data databaseResourceModel
+func (r roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data roleResourceModel
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create the request", err.Error())
@@ -249,16 +246,16 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 	defer response.Body.Close()
 	inner := struct {
-		Database databaseResourceJSON `json:"database"`
+		Role roleResourceJSON `json:"role"`
 	}{
-		Database: databaseResourceJSON{},
+		Role: roleResourceJSON{},
 	}
 	err = json.NewDecoder(response.Body).Decode(&inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toDatabaseModel(&inner.Database))
+	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -266,34 +263,14 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 }
 
-func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r roleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	time.Sleep(20 * time.Second)
-	var data databaseResourceModel
+	var data roleResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	content := struct {
-		Database struct {
-			Name      string `json:"name"`
-			OwnerName string `json:"owner_name,omitempty"`
-		} `json:"database"`
-	}{
-		Database: struct {
-			Name      string `json:"name"`
-			OwnerName string `json:"owner_name,omitempty"`
-		}{
-			Name:      data.Name.ValueString(),
-			OwnerName: data.OwnerName.ValueString(),
-		},
-	}
-	b, err := json.Marshal(content)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal project", err.Error())
-		return
-	}
-	fmt.Println(string(b))
 	key, ok := os.LookupEnv("NEON_API_KEY")
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -302,8 +279,10 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 		)
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
-	request, err := http.NewRequest("PATCH", url, bytes.NewBuffer(b))
+	//review
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s/reset_password", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
+	fmt.Println(url)
+	request, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create the request", err.Error())
 		return
@@ -312,24 +291,24 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create database", err.Error())
+		resp.Diagnostics.AddError("Failed to create role", err.Error())
 		return
 	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create database, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to create role, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()
 	inner := struct {
-		Database databaseResourceJSON `json:"database"`
+		Role roleResourceJSON `json:"role"`
 	}{
-		Database: databaseResourceJSON{},
+		Role: roleResourceJSON{},
 	}
 	err = json.NewDecoder(response.Body).Decode(&inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toDatabaseModel(&inner.Database))
+	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -337,6 +316,6 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 }
 
-func (r databaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r roleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

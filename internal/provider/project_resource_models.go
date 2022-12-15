@@ -8,15 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type roleResourceJSON struct {
-	BranchID  string `json:"branch_id"`
-	Name      string `json:"name"`
-	Password  string `json:"password"`
-	Protected bool   `json:"protected"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-
 type projectConnUrisJSON struct {
 	ConnectionURI string `json:"connection_uri"`
 }
@@ -46,15 +37,6 @@ type projectResourceJSON struct {
 	Databases      []databaseResourceJSON   `json:"databases"`
 	Branch         *branchResourceJSON      `json:"branch"`
 	Endpoints      []endpointResourceJSON   `json:"endpoints"`
-}
-
-type roleResourceModel struct {
-	BranchID  types.String `tfsdk:"branch_id"`
-	Name      types.String `tfsdk:"name"`
-	Password  types.String `tfsdk:"password"`
-	Protected types.Bool   `tfsdk:"protected"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
 }
 
 type projectConnUrisModel struct {
@@ -135,16 +117,10 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 		m.ConnectionUris = aux
 	}
 	if len(p.Roles) != 0 {
-		r := []roleResourceModel{}
+		r := []types.Object{}
 		for _, v := range p.Roles {
-			r = append(r, roleResourceModel{
-				BranchID:  types.StringValue(v.BranchID),
-				Name:      types.StringValue(v.Name),
-				Password:  types.StringValue(v.Password),
-				Protected: types.BoolValue(v.Protected),
-				CreatedAt: types.StringValue(v.CreatedAt),
-				UpdatedAt: types.StringValue(v.UpdatedAt),
-			})
+			aux := toRoleModel(&v)
+			r = append(r, aux)
 		}
 		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
 		m.Roles = aux
@@ -215,24 +191,15 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 	if !m.Roles.IsNull() {
 		p.Roles = []roleResourceJSON{}
 		for _, vv := range m.Roles.Elements() {
-			v := roleResourceModel{}
-			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
-			p.Roles = append(p.Roles, roleResourceJSON{
-				BranchID:  v.BranchID.ValueString(),
-				Name:      v.Name.ValueString(),
-				Password:  v.Password.ValueString(),
-				Protected: v.Protected.ValueBool(),
-				CreatedAt: v.UpdatedAt.ValueString(),
-				UpdatedAt: v.UpdatedAt.ValueString(),
-			})
+			roleObj := vv.(types.Object)
+			role := toRoleJSON(&roleObj)
+			p.Roles = append(p.Roles, *role)
 		}
 	}
 	if !m.Databases.IsNull() {
 		p.Databases = []databaseResourceJSON{}
 		for _, vv := range m.Databases.Elements() {
-			v := databaseResourceModel{}
 			databaseObj := vv.(types.Object)
-			databaseObj.As(context.TODO(), &v, types.ObjectAsOptions{})
 			aux := toDatabaseJSON(&databaseObj)
 			p.Databases = append(p.Databases, *aux)
 		}

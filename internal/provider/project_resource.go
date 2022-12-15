@@ -30,29 +30,6 @@ func NewProjectResource() resource.Resource {
 	}
 }
 
-func roleResourceAttr() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"branch_id": schema.StringAttribute{
-			Computed: true,
-		},
-		"name": schema.StringAttribute{
-			Computed: true,
-		},
-		"password": schema.StringAttribute{
-			Computed: true,
-		},
-		"protected": schema.BoolAttribute{
-			Computed: true,
-		},
-		"created_at": schema.StringAttribute{
-			Computed: true,
-		},
-		"updated_at": schema.StringAttribute{
-			Computed: true,
-		},
-	}
-}
-
 func connectionUriResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"connection_uri": schema.StringAttribute{
