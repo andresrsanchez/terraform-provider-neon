@@ -53,29 +53,6 @@ func roleResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func databaseResourceAttr() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"id": schema.Int64Attribute{
-			Computed: true,
-		},
-		"branch_id": schema.StringAttribute{
-			Computed: true,
-		},
-		"name": schema.StringAttribute{
-			Computed: true,
-		},
-		"owner_name": schema.StringAttribute{
-			Computed: true,
-		},
-		"created_at": schema.StringAttribute{
-			Computed: true,
-		},
-		"updated_at": schema.StringAttribute{
-			Computed: true,
-		},
-	}
-}
-
 func connectionUriResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"connection_uri": schema.StringAttribute{
@@ -209,13 +186,12 @@ type createProject struct {
 
 func (r projectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	data := newProjectResourceModel()
-
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	c := createProject{
 		Name:                     data.Name.ValueString(),
 		Provisioner:              data.Provisioner.ValueString(),
@@ -366,12 +342,6 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 		//what should i do?
 		return
 	}
-
-	diags = resp.State.Set(ctx, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 type updateProject struct {
@@ -429,10 +399,10 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	request.Header.Set("Content-Type", "application/json")
 	response, err := r.client.Do(request)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
+		resp.Diagnostics.AddError("Failed to update project", err.Error())
 		return
 	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
+		resp.Diagnostics.AddError("Failed to update project, response status ", response.Status)
 		return
 	}
 	defer response.Body.Close()

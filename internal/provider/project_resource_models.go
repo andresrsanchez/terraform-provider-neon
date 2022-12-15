@@ -16,14 +16,6 @@ type roleResourceJSON struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
-type databaseResourceJSON struct {
-	ID        int64  `json:"id"`
-	BranchID  string `json:"branch_id"`
-	Name      string `json:"name"`
-	OwnerName string `json:"owner_name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
 
 type projectConnUrisJSON struct {
 	ConnectionURI string `json:"connection_uri"`
@@ -61,14 +53,6 @@ type roleResourceModel struct {
 	Name      types.String `tfsdk:"name"`
 	Password  types.String `tfsdk:"password"`
 	Protected types.Bool   `tfsdk:"protected"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
-}
-type databaseResourceModel struct {
-	ID        types.Int64  `tfsdk:"id"`
-	BranchID  types.String `tfsdk:"branch_id"`
-	Name      types.String `tfsdk:"name"`
-	OwnerName types.String `tfsdk:"owner_name"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
@@ -166,16 +150,10 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 		m.Roles = aux
 	}
 	if len(p.Databases) != 0 {
-		d := []databaseResourceModel{}
+		d := []types.Object{}
 		for _, v := range p.Databases {
-			d = append(d, databaseResourceModel{
-				ID:        types.Int64Value(v.ID),
-				BranchID:  types.StringValue(v.BranchID),
-				Name:      types.StringValue(v.Name),
-				OwnerName: types.StringValue(v.OwnerName),
-				CreatedAt: types.StringValue(v.CreatedAt),
-				UpdatedAt: types.StringValue(v.UpdatedAt),
-			})
+			aux := toDatabaseModel(&v)
+			d = append(d, aux)
 		}
 		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
 		m.Databases = aux
@@ -253,15 +231,10 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Databases = []databaseResourceJSON{}
 		for _, vv := range m.Databases.Elements() {
 			v := databaseResourceModel{}
-			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
-			p.Databases = append(p.Databases, databaseResourceJSON{
-				ID:        v.ID.ValueInt64(),
-				BranchID:  v.BranchID.ValueString(),
-				Name:      v.Name.ValueString(),
-				OwnerName: v.OwnerName.ValueString(),
-				CreatedAt: v.CreatedAt.ValueString(),
-				UpdatedAt: v.UpdatedAt.ValueString(),
-			})
+			databaseObj := vv.(types.Object)
+			databaseObj.As(context.TODO(), &v, types.ObjectAsOptions{})
+			aux := toDatabaseJSON(&databaseObj)
+			p.Databases = append(p.Databases, *aux)
 		}
 	}
 	if m.Endpoints.IsNull() {

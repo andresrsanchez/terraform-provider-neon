@@ -54,6 +54,7 @@ func (p neon) Resources(ctx context.Context) []func() resource.Resource {
 		NewEndpointResource,
 		NewProjectResource,
 		NewBranchResource,
+		NewDatabaseResource,
 	}
 }
 
