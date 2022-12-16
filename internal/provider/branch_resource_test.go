@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -18,7 +17,6 @@ func TestBranchResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("neon_project.test", "name", "name_project"),
 					resource.TestCheckResourceAttr("neon_branch.test", "name", "name_branch"),
-					resource.TestCheckResourceAttr("neon_branch.test", "endpoints", "patata"),
 				),
 			},
 		},
@@ -26,7 +24,7 @@ func TestBranchResource(t *testing.T) {
 }
 
 func testNeonBranchResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name_project"
 }
@@ -39,13 +37,8 @@ resource "neon_branch" "test" {
 			type = "read_write"
 			autoscaling_limit_min_cu = 1
 			autoscaling_limit_max_cu = 1
-		},
-		{
-			type = "read_write"
-			autoscaling_limit_min_cu = 1
-			autoscaling_limit_max_cu = 1
 		}
 	]
 }
-`)
+`
 }

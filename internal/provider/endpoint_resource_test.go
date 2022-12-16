@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -42,14 +41,6 @@ func TestEndpointResource(t *testing.T) {
 	})
 }
 
-func testNeonEndpointResourceConfig2() string {
-	return fmt.Sprintf(`
-resource "neon_endpoint" "test" {
-	branch_id = "branch"
-	type = "read_write"
-}
-`)
-}
 func testNeonEndpointResourceConfig1() string {
 	return `
 provider "neon" {}

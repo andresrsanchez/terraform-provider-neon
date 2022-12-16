@@ -1,22 +1,21 @@
 package provider
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
-	"time"
 
+	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type roleResource struct {
-	client *http.Client
+	client *resty.Client
 }
 type roleResourceJSON struct {
 	ProjectID string `json:"project_id"`
@@ -39,12 +38,6 @@ type roleResourceModel struct {
 
 var _ resource.Resource = roleResource{}
 var _ resource.ResourceWithImportState = roleResource{}
-
-func NewRoleResource() resource.Resource {
-	return roleResource{
-		client: &http.Client{},
-	}
-}
 
 func roleResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
@@ -72,9 +65,9 @@ func roleResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toRoleJSON(in *types.Object) *roleResourceJSON {
+func toRoleJSON(in *types.Object) (*roleResourceJSON, diag.Diagnostics) {
 	v := roleResourceModel{}
-	in.As(context.TODO(), &in, types.ObjectAsOptions{})
+	diags := in.As(context.TODO(), &in, basetypes.ObjectAsOptions{})
 	return &roleResourceJSON{
 		BranchID:  v.BranchID.ValueString(),
 		Name:      v.Name.ValueString(),
@@ -82,10 +75,10 @@ func toRoleJSON(in *types.Object) *roleResourceJSON {
 		Protected: v.Protected.ValueBool(),
 		CreatedAt: v.UpdatedAt.ValueString(),
 		UpdatedAt: v.UpdatedAt.ValueString(),
-	}
+	}, diags
 }
 
-func toRoleModel(v *roleResourceJSON) types.Object {
+func toRoleModel(v *roleResourceJSON) (types.Object, diag.Diagnostics) {
 	db := roleResourceModel{
 		BranchID:  types.StringValue(v.BranchID),
 		Name:      types.StringValue(v.Name),
@@ -94,8 +87,7 @@ func toRoleModel(v *roleResourceJSON) types.Object {
 		CreatedAt: types.StringValue(v.CreatedAt),
 		UpdatedAt: types.StringValue(v.UpdatedAt),
 	}
-	aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(databaseResourceAttr()), db)
-	return aux
+	return types.ObjectValueFrom(context.TODO(), typeFromAttrs(roleResourceAttr()), db)
 }
 
 func (r roleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -105,7 +97,7 @@ func (r roleResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 }
 
 func (r roleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	time.Sleep(20 * time.Second)
+	fmt.Println("hi 5")
 	var data roleResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -123,54 +115,32 @@ func (r roleResource) Create(ctx context.Context, req resource.CreateRequest, re
 			Name: data.Name.ValueString(),
 		},
 	}
-	b, err := json.Marshal(content)
+	response, err := r.client.R().
+		SetBody(content).
+		Post(fmt.Sprintf("/projects/%s/branches/%s/roles", data.ProjectID.ValueString(), data.BranchID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal role", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create role resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	fmt.Println(string(b))
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles", data.ProjectID.ValueString(), data.BranchID.ValueString())
-	fmt.Println(url)
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create role", err.Error())
-		return
-	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create role, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
+
 	inner := struct {
 		Role roleResourceJSON `json:"role"`
 	}{
 		Role: roleResourceJSON{},
 	}
-	err = json.NewDecoder(response.Body).Decode(&inner)
+	err = json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
+	roleObj, diags := toRoleModel(&inner.Role)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
 		return
 	}
+	diags = resp.State.Set(ctx, roleObj)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r roleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -180,33 +150,12 @@ func (r roleResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
-	request, err := http.NewRequest("DELETE", url, nil)
+	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete role", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to delete role, response status ", response.Status)
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
 	resp.State.RemoveResource(ctx)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 func (r roleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -220,100 +169,65 @@ func (r roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
-	request, err := http.NewRequest("GET", url, nil)
+
+	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/roles/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
 	inner := struct {
 		Role roleResourceJSON `json:"role"`
 	}{
 		Role: roleResourceJSON{},
 	}
-	err = json.NewDecoder(response.Body).Decode(&inner)
+	err = json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
+	roleObj, diags := toRoleModel(&inner.Role)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
 		return
 	}
+	diags = resp.State.Set(ctx, roleObj)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r roleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	time.Sleep(20 * time.Second)
 	var data roleResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	//review
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s/roles/%s/reset_password", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString())
-	fmt.Println(url)
-	request, err := http.NewRequest("POST", url, nil)
+
+	response, err := r.client.R().
+		Post(fmt.Sprintf("/projects/%s/branches/%s/roles/%s/reset_password", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create role resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create role", err.Error())
-		return
-	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create role, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
+
 	inner := struct {
 		Role roleResourceJSON `json:"role"`
 	}{
 		Role: roleResourceJSON{},
 	}
-	err = json.NewDecoder(response.Body).Decode(&inner)
+	err = json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	diags = resp.State.Set(ctx, toRoleModel(&inner.Role))
+	roleObj, diags := toRoleModel(&inner.Role)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
 		return
 	}
+	diags = resp.State.Set(ctx, roleObj)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r roleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

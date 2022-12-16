@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -69,7 +70,7 @@ func (m *endpointResourceModel) ToEndpointResourceJSON() *endpointResourceJSON {
 	}
 	/*if !m.Settings.IsNull() {
 		v := endpointSettingsModel{}
-		m.Settings.As(context.TODO(), &v, types.ObjectAsOptions{})
+		m.Settings.As(context.TODO(), &v, basetypes.ObjectAsOptions{})
 		e.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	return e
@@ -106,12 +107,12 @@ func (m *endpointResourceJSON) ToEndpointResourceModel() *endpointResourceModel 
 	return e
 }
 
-func (m *endpointSettingsJSON) ToEndpointSettingsModel() *endpointSettingsModel {
-	settings, _ := types.MapValueFrom(context.TODO(), types.StringType, m.PgSettings)
+func (m *endpointSettingsJSON) ToEndpointSettingsModel() (*endpointSettingsModel, diag.Diagnostics) {
+	settings, diags := types.MapValueFrom(context.TODO(), types.StringType, m.PgSettings)
 	return &endpointSettingsModel{
 		//Description: types.StringValue(m.Description),
 		PgSettings: settings,
-	}
+	}, diags
 }
 
 func (m *endpointSettingsModel) ToEndpointSettingsJSON() *endpointSettingsJSON {

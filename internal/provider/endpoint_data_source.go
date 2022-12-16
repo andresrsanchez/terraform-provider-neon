@@ -188,14 +188,4 @@ func (d endpointDataResource) Read(ctx context.Context, req datasource.ReadReque
 	//tflog.Trace(ctx, "created a resource")
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		//what should i do?
-		return
-	}
-
-	diags = resp.State.Set(ctx, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }

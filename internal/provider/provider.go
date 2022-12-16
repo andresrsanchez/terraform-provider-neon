@@ -2,10 +2,11 @@ package provider
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"os"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	lol "github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -13,48 +14,65 @@ import (
 )
 
 // Ensure ScaffoldingProvider satisfies various provider interfaces.
-var _ provider.Provider = neon{}
-var _ provider.ProviderWithMetadata = neon{}
-var _ provider.ProviderWithSchema = neon{}
+var _ provider.Provider = &neon{}
 
 // neon defines the provider implementation.
 type neon struct {
-	version    string
-	httpClient http.Client
+	version string
+	client  *resty.Client
 }
 
-type neonData struct{}
-
-func (p neon) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *neon) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "neon"
 	resp.Version = p.version
 }
 
-func (p neon) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *neon) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = lol.Schema{}
 }
 
-func (provider neon) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	if _, ok := os.LookupEnv("NEON_API_KEY"); !ok {
+func (provider *neon) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var key string
+	var ok bool
+	if key, ok = os.LookupEnv("NEON_API_KEY"); !ok {
 		resp.Diagnostics.AddError(
 			"Unable to find token",
 			"token cannot be an empty string",
 		)
 		return
 	}
-	provider.httpClient = http.Client{
-		Timeout: 60 * time.Second,
-	}
-	//resp.DataSourceData = client
-	//resp.ResourceData = client
+	provider.client = resty.New().
+		SetBaseURL("https://console.neon.tech/api/v2").
+		SetAuthToken(key).
+		SetHeader("Content-Type", "application/json").
+		SetTimeout(30 * time.Second).
+		SetRetryCount(3).
+		SetRetryWaitTime(10 * time.Second).
+		SetError(fmt.Errorf("generic error"))
 }
 
 func (p neon) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewEndpointResource,
-		NewProjectResource,
-		NewBranchResource,
-		NewDatabaseResource,
+		func() resource.Resource {
+			return &branchResource{
+				client: p.client,
+			}
+		},
+		func() resource.Resource {
+			return &projectResource{
+				client: p.client,
+			}
+		},
+		func() resource.Resource {
+			return &endpointResource{
+				client: p.client,
+			}
+		},
+		func() resource.Resource {
+			return &databaseResource{
+				client: p.client,
+			}
+		},
 	}
 }
 

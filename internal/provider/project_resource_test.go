@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -18,7 +17,7 @@ func TestProjectResource(t *testing.T) {
 				Config: testNeonProjectResourceBasic(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("neon_project.test", "name", "name"),
-					resource.TestCheckResourceAttr("neon_project.test", "provisioner", "k8s-pod"),
+					resource.TestCheckResourceAttr("neon_project.test", "engine", "k8s-pod"),
 					resource.TestCheckResourceAttr("neon_project.test", "region_id", "aws-us-east-2"),
 					resource.TestCheckResourceAttr("neon_project.test", "pg_version", "14"),
 					//resource.TestCheckResourceAttr("neon_project.test", "settings", "name"),
@@ -48,14 +47,14 @@ func TestProjectResource(t *testing.T) {
 }
 
 func testNeonProjectResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name"
-	provisioner = "k8s-pod"
+	engine = "k8s-pod"
 	region_id = "aws-us-east-2"
 	pg_version = 14	
 }
-`)
+`
 }
 
 //	Provisioner              string                `json:"provisioner,omitempty"`

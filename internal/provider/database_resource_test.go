@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -26,7 +25,7 @@ func TestDatabaseResource(t *testing.T) {
 }
 
 func testNeonDatabaseResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name_project"
 }
@@ -34,6 +33,13 @@ resource "neon_project" "test" {
 resource "neon_branch" "test" {
 	project_id = neon_project.test.id
 	name = "name_branch"
+	endpoints = [
+		{
+			type = "read_write"
+			autoscaling_limit_min_cu = 1
+			autoscaling_limit_max_cu = 1
+		}
+	]
 }
 
 resource "neon_database" "test" {
@@ -41,6 +47,7 @@ resource "neon_database" "test" {
 	branch_id = neon_branch.test.id
 	name = "name_database"
 	owner_name = "andresrsanchez"
+	
 }
-`)
+`
 }
