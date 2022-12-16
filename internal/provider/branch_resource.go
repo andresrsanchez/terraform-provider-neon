@@ -1,13 +1,12 @@
 package provider
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
 
+	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -15,7 +14,7 @@ import (
 )
 
 type branchResource struct {
-	client *http.Client
+	client *resty.Client
 }
 type branchResourceJSON struct {
 	ID               string `json:"id"`
@@ -50,12 +49,6 @@ type BranchResourceModel struct {
 
 var _ resource.Resource = branchResource{}
 var _ resource.ResourceWithImportState = branchResource{}
-
-func NewBranchResource() resource.Resource {
-	return branchResource{
-		client: &http.Client{},
-	}
-}
 
 func branchResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
@@ -104,7 +97,7 @@ func branchResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toBranchModel(in *branchResourceJSON) types.Object {
+func toBranchModel(in *branchResourceJSON) (types.Object, diag.Diagnostics) {
 	branch := BranchResourceModel{
 		ID:               types.StringValue(in.ID),
 		ProjectID:        types.StringValue(in.ProjectID),
@@ -120,13 +113,12 @@ func toBranchModel(in *branchResourceJSON) types.Object {
 		LogicalSizeLimit: types.Int64Value(in.LogicalSizeLimit),
 		PhysicalSize:     types.Int64Value(in.PhysicalSize),
 	}
-	aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(branchResourceAttr()), branch)
-	return aux
+	return types.ObjectValueFrom(context.TODO(), typeFromAttrs(branchResourceAttr()), branch)
 }
 
-func toBranchJSON(in *types.Object) *branchResourceJSON {
+func toBranchJSON(in *types.Object) (*branchResourceJSON, diag.Diagnostics) {
 	v := BranchResourceModel{}
-	in.As(context.TODO(), &v, types.ObjectAsOptions{})
+	diags := in.As(context.TODO(), &v, types.ObjectAsOptions{})
 	return &branchResourceJSON{
 		ID:               v.ID.ValueString(),
 		ProjectID:        v.ProjectID.ValueString(),
@@ -141,7 +133,7 @@ func toBranchJSON(in *types.Object) *branchResourceJSON {
 		LogicalSize:      v.LogicalSize.ValueInt64(),
 		LogicalSizeLimit: v.LogicalSizeLimit.ValueInt64(),
 		PhysicalSize:     v.PhysicalSize.ValueInt64(),
-	}
+	}, diags
 }
 
 func (r branchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -175,51 +167,30 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 			Parent_timestamp: data.ParentLsn.ValueString(),
 		},
 	}
-	b, err := json.Marshal(content)
+	response, err := r.client.R().
+		SetBody(content).
+		Post(fmt.Sprintf("/projects/%s/branches", data.ProjectID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal project", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches", data.ProjectID.ValueString())
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create branch", err.Error())
-		return
-	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create branch, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
 
 	branchJSON := struct {
 		Branch branchResourceJSON `json:"branch"`
 	}{}
-	err = json.NewDecoder(response.Body).Decode(&branchJSON)
+	err = json.Unmarshal(response.Body(), &branchJSON)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	branchObj := toBranchModel(&branchJSON.Branch)
-	diags = resp.State.Set(ctx, branchObj)
+	branchObj, diags := toBranchModel(&branchJSON.Branch)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	diags = resp.State.Set(ctx, branchObj)
+	resp.Diagnostics.Append(diags...)
+
 }
 
 func (r branchResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -234,33 +205,12 @@ func (r branchResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString())
-	request, err := http.NewRequest("DELETE", url, nil)
+	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete branch", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to delete branch, response status ", response.Status)
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
 	resp.State.RemoveResource(ctx)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 func (r branchResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -279,40 +229,25 @@ func (r branchResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString())
-	request, err := http.NewRequest("GET", url, nil)
+
+	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
 	inner := struct {
 		Branch branchResourceJSON `json:"branch"`
 	}{}
-	err = json.NewDecoder(response.Body).Decode(&inner)
+	err = json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	branchObj := toBranchModel(&inner.Branch)
+	branchObj, diags := toBranchModel(&inner.Branch)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	diags = resp.State.Set(ctx, branchObj)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -333,50 +268,28 @@ func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}{
 		Name: data.Name.ValueString(),
 	}
-	b, err := json.Marshal(content)
+	response, err := r.client.R().
+		SetBody(content).
+		Patch(fmt.Sprintf("/projects/%s/branches/%s", data.ProjectID.ValueString(), data.ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal endpoint", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", data.ProjectID.ValueString(), data.ID.ValueString())
-	request, err := http.NewRequest("PATCH", url, bytes.NewBuffer(b))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to update branch", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to update branch, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
 	branchJSON := struct {
 		Branch branchResourceJSON `json:"branch"`
 	}{}
-	err = json.NewDecoder(response.Body).Decode(&branchJSON)
+	err = json.Unmarshal(response.Body(), &branchJSON)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	branchObj := toBranchModel(&branchJSON.Branch)
-	diags = resp.State.Set(ctx, branchObj)
+	branchObj, diags := toBranchModel(&branchJSON.Branch)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	diags = resp.State.Set(ctx, branchObj)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r branchResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

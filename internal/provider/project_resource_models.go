@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -68,8 +69,8 @@ type projectResourceModel struct {
 	Endpoints             types.List   `tfsdk:"endpoints"`
 }
 
-func newProjectResourceModel() projectResourceModel {
-	return projectResourceModel{
+func newProjectResourceModel() *projectResourceModel {
+	return &projectResourceModel{
 		//Settings:       types.ObjectNull(typeFromAttrs(defaultSettingsResourceAttr())),
 		ConnectionUris: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}),
 		Roles:          types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}),
@@ -79,7 +80,7 @@ func newProjectResourceModel() projectResourceModel {
 	}
 }
 
-func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
+func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, diag.Diagnostics) {
 	m := newProjectResourceModel()
 	m.MaintenanceStartsAt = types.StringValue(p.Project.MaintenanceStartsAt)
 	m.ID = types.StringValue(p.Project.ID)
@@ -103,7 +104,10 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 		m.Settings = aux
 	}*/
 	if p.Branch != nil {
-		aux := toBranchModel(p.Branch)
+		aux, diags := toBranchModel(p.Branch)
+		if diags.HasError() {
+			return nil, diags
+		}
 		m.Branch = aux
 	}
 	if len(p.ConnectionUris) != 0 {
@@ -113,25 +117,44 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 				ConnectionURI: types.StringValue(v.ConnectionURI),
 			})
 		}
-		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}, c)
+		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}, c)
+		if diags.HasError() {
+			return nil, diags
+		}
 		m.ConnectionUris = aux
 	}
 	if len(p.Roles) != 0 {
-		r := []types.Object{}
+		r := []roleResourceModel{}
 		for _, v := range p.Roles {
-			aux := toRoleModel(&v)
-			r = append(r, aux)
+			aux, diags := toRoleModel(&v)
+			var auxType roleResourceModel
+			aux.As(context.TODO(), &auxType, types.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			r = append(r, auxType)
 		}
-		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
+		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
+		if diags.HasError() {
+			return nil, diags
+		}
 		m.Roles = aux
 	}
 	if len(p.Databases) != 0 {
-		d := []types.Object{}
+		d := []databaseResourceModel{}
 		for _, v := range p.Databases {
-			aux := toDatabaseModel(&v)
-			d = append(d, aux)
+			aux, diags := toDatabaseModel(&v)
+			var auxType databaseResourceModel
+			aux.As(context.TODO(), &auxType, types.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+			d = append(d, auxType)
 		}
-		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
+		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
+		if diags.HasError() {
+			return nil, diags
+		}
 		m.Databases = aux
 	}
 	if len(p.Endpoints) != 0 {
@@ -140,10 +163,13 @@ func (p *projectResourceJSON) ToProjectResourceModel() projectResourceModel {
 			ee := *v.ToEndpointResourceModel()
 			e = append(e, ee)
 		}
-		aux, _ := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
+		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
+		if diags.HasError() {
+			return nil, diags
+		}
 		m.Endpoints = aux
 	}
-	return m
+	return m, nil
 }
 func typeFromAttrs(in map[string]schema.Attribute) map[string]attr.Type {
 	out := map[string]attr.Type{}
@@ -152,8 +178,8 @@ func typeFromAttrs(in map[string]schema.Attribute) map[string]attr.Type {
 	}
 	return out
 }
-func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
-	p := projectResourceJSON{
+func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, diag.Diagnostics) {
+	p := &projectResourceJSON{
 		Project: innerProjectResourceJSON{
 			MaintenanceStartsAt:   m.MaintenanceStartsAt.ValueString(),
 			ID:                    m.ID.ValueString(),
@@ -175,14 +201,20 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	if !m.Branch.IsNull() {
-		aux := toBranchJSON(&m.Branch)
+		aux, diags := toBranchJSON(&m.Branch)
+		if diags.HasError() {
+			return nil, diags
+		}
 		p.Branch = aux
 	}
 	if !m.ConnectionUris.IsNull() {
 		p.ConnectionUris = []projectConnUrisJSON{}
 		for _, vv := range m.ConnectionUris.Elements() {
 			v := projectConnUrisModel{}
-			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
+			diags := vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
 			p.ConnectionUris = append(p.ConnectionUris, projectConnUrisJSON{
 				ConnectionURI: v.ConnectionURI.ValueString(),
 			})
@@ -192,7 +224,10 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Roles = []roleResourceJSON{}
 		for _, vv := range m.Roles.Elements() {
 			roleObj := vv.(types.Object)
-			role := toRoleJSON(&roleObj)
+			role, diags := toRoleJSON(&roleObj)
+			if diags.HasError() {
+				return nil, diags
+			}
 			p.Roles = append(p.Roles, *role)
 		}
 	}
@@ -200,7 +235,10 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Databases = []databaseResourceJSON{}
 		for _, vv := range m.Databases.Elements() {
 			databaseObj := vv.(types.Object)
-			aux := toDatabaseJSON(&databaseObj)
+			aux, diags := toDatabaseJSON(&databaseObj)
+			if diags.HasError() {
+				return nil, diags
+			}
 			p.Databases = append(p.Databases, *aux)
 		}
 	}
@@ -208,9 +246,12 @@ func (m *projectResourceModel) ToProjectResourceJSON() projectResourceJSON {
 		p.Endpoints = []endpointResourceJSON{}
 		for _, vv := range m.Endpoints.Elements() {
 			v := endpointResourceModel{}
-			vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
+			diags := vv.(types.Object).As(context.TODO(), &v, types.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
 			p.Endpoints = append(p.Endpoints, *v.ToEndpointResourceJSON())
 		}
 	}
-	return p
+	return p, nil
 }

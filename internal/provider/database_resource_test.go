@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -26,7 +25,7 @@ func TestDatabaseResource(t *testing.T) {
 }
 
 func testNeonDatabaseResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name_project"
 }
@@ -42,5 +41,5 @@ resource "neon_database" "test" {
 	name = "name_database"
 	owner_name = "andresrsanchez"
 }
-`)
+`
 }

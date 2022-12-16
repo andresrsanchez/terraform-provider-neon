@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -48,14 +47,14 @@ func TestProjectResource(t *testing.T) {
 }
 
 func testNeonProjectResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name"
 	provisioner = "k8s-pod"
 	region_id = "aws-us-east-2"
 	pg_version = 14	
 }
-`)
+`
 }
 
 //	Provisioner              string                `json:"provisioner,omitempty"`

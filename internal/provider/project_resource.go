@@ -1,13 +1,11 @@
 package provider
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -18,17 +16,11 @@ import (
 )
 
 type projectResource struct {
-	client *http.Client
+	client *resty.Client
 }
 
 var _ resource.Resource = projectResource{}
 var _ resource.ResourceWithImportState = projectResource{}
-
-func NewProjectResource() resource.Resource {
-	return projectResource{
-		client: &http.Client{},
-	}
-}
 
 func connectionUriResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
@@ -169,67 +161,43 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	c := createProject{
-		Name:                     data.Name.ValueString(),
-		Provisioner:              data.Provisioner.ValueString(),
-		RegionID:                 data.RegionID.ValueString(),
-		PgVersion:                data.PgVersion.ValueInt64(),
-		Autoscaling_limit_min_cu: data.AutoscalingLimitMinCu.ValueInt64(),
-		Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
-	}
-	/*if !data.Settings.IsNull() {
-		v := endpointSettingsModel{}
-		data.Settings.As(context.TODO(), &v, types.ObjectAsOptions{})
-		c.Settings = v.ToEndpointSettingsJSON()
-	}*/
 	content := struct {
 		Project createProject `json:"project"`
 	}{
-		Project: c,
+		Project: createProject{
+			Name:                     data.Name.ValueString(),
+			Provisioner:              data.Provisioner.ValueString(),
+			RegionID:                 data.RegionID.ValueString(),
+			PgVersion:                data.PgVersion.ValueInt64(),
+			Autoscaling_limit_min_cu: data.AutoscalingLimitMinCu.ValueInt64(),
+			Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
+		},
 	}
-	b, err := json.Marshal(content)
+	response, err := r.client.R().
+		SetBody(content).
+		Post("/projects")
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal project", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request, err := http.NewRequest("POST", "https://console.neon.tech/api/v2/projects", bytes.NewBuffer(b))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusCreated {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
+
 	inner := projectResourceJSON{}
-	err = json.NewDecoder(response.Body).Decode(&inner)
+	err = json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
+	fmt.Printf("%+v\n", inner)
+	fmt.Println("")
 	//tflog.Trace(ctx, "created a resource")
-	plan := inner.ToProjectResourceModel()
-	diags = resp.State.Set(ctx, plan)
+	plan, diags := inner.ToProjectResourceModel()
+	fmt.Printf("%+v\n", plan)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		//what should i do?
+	if diags.HasError() {
 		return
 	}
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 // Delete implements resource.Resource
@@ -238,33 +206,12 @@ func (r projectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s", data.ID.ValueString())
-	request, err := http.NewRequest("DELETE", url, nil)
+	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to delete project, response status ", response.Status)
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
 	resp.State.RemoveResource(ctx)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 // Metadata implements resource.Resource
@@ -281,44 +228,24 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s", data.ID.ValueString())
-	request, err := http.NewRequest("GET", url, nil)
+	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to create project, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
 	project := &projectResourceJSON{}
-	err = json.NewDecoder(response.Body).Decode(project)
+	err = json.Unmarshal(response.Body(), &project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	//tflog.Trace(ctx, "created a resource")
-	diags = resp.State.Set(ctx, project.ToProjectResourceModel())
+	plan, diags := project.ToProjectResourceModel()
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		//what should i do?
+	if diags.HasError() {
 		return
 	}
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 type updateProject struct {
@@ -353,49 +280,27 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}{
 		Project: u,
 	}
-	b, err := json.Marshal(content)
+	response, err := r.client.R().
+		SetBody(content).
+		Patch(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal endpoint", err.Error())
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s", data.ID.ValueString())
-	request, err := http.NewRequest("PATCH", url, bytes.NewBuffer(b))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to update project", err.Error())
-		return
-	} else if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Failed to update project, response status ", response.Status)
-		return
-	}
-	defer response.Body.Close()
+
 	project := &projectResourceJSON{}
-	err = json.NewDecoder(response.Body).Decode(project)
+	err = json.Unmarshal(response.Body(), &project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	//tflog.Trace(ctx, "created a resource")
-	diags = resp.State.Set(ctx, project.ToProjectResourceModel())
+	plan, diags := project.ToProjectResourceModel()
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		//what should i do?
+	if diags.HasError() {
 		return
 	}
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r projectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

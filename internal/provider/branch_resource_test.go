@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -26,7 +25,7 @@ func TestBranchResource(t *testing.T) {
 }
 
 func testNeonBranchResourceBasic() string {
-	return fmt.Sprintf(`
+	return `
 resource "neon_project" "test" {
 	name = "name_project"
 }
@@ -47,5 +46,5 @@ resource "neon_branch" "test" {
 		}
 	]
 }
-`)
+`
 }
