@@ -66,9 +66,9 @@ func databaseResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toDatabaseJSON(v *types.Object) (*databaseResourceJSON, diag.Diagnostics) {
+func toDatabaseJSON(v *types.Object, ctx context.Context) (*databaseResourceJSON, diag.Diagnostics) {
 	in := databaseResourceModel{}
-	diags := v.As(context.TODO(), &in, basetypes.ObjectAsOptions{})
+	diags := v.As(ctx, &in, basetypes.ObjectAsOptions{})
 	return &databaseResourceJSON{
 		ID:        in.ID.ValueInt64(),
 		BranchID:  in.BranchID.ValueString(),
@@ -80,7 +80,7 @@ func toDatabaseJSON(v *types.Object) (*databaseResourceJSON, diag.Diagnostics) {
 	}, diags
 }
 
-func toDatabaseModel(in *databaseResourceJSON, projectID string) (types.Object, diag.Diagnostics) {
+func toDatabaseModel(in *databaseResourceJSON, projectID string, ctx context.Context) (types.Object, diag.Diagnostics) {
 	db := databaseResourceModel{
 		ID:        types.Int64Value(in.ID),
 		BranchID:  types.StringValue(in.BranchID),
@@ -90,7 +90,7 @@ func toDatabaseModel(in *databaseResourceJSON, projectID string) (types.Object, 
 		UpdatedAt: types.StringValue(in.UpdatedAt),
 		ProjectID: types.StringValue(projectID),
 	}
-	return types.ObjectValueFrom(context.TODO(), typeFromAttrs(databaseResourceAttr()), db)
+	return types.ObjectValueFrom(ctx, typeFromAttrs(databaseResourceAttr()), db)
 }
 
 func (r databaseResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -147,7 +147,7 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString())
+	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -198,7 +198,7 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString())
+	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -247,7 +247,7 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString())
+	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?

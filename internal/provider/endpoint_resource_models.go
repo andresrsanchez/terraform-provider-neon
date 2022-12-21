@@ -70,7 +70,7 @@ func (m *endpointResourceModel) ToEndpointResourceJSON() *endpointResourceJSON {
 	}
 	/*if !m.Settings.IsNull() {
 		v := endpointSettingsModel{}
-		m.Settings.As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+		m.Settings.As(ctx, &v, basetypes.ObjectAsOptions{})
 		e.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	return e
@@ -97,18 +97,18 @@ func (m *endpointResourceJSON) ToEndpointResourceModel() *endpointResourceModel 
 		UpdatedAt:             types.StringValue(m.UpdatedAt),
 	}
 	/*if m.Settings != nil {
-		pg, _ := types.MapValueFrom(context.TODO(), types.StringType, m.Settings.PgSettings)
+		pg, _ := types.MapValueFrom(ctx, types.StringType, m.Settings.PgSettings)
 		settings := map[string]attr.Value{
 			"pg_settings": pg,
 		}
-		aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(defaultSettingsResourceAttr()), settings)
+		aux, _ := types.ObjectValueFrom(ctx, typeFromAttrs(defaultSettingsResourceAttr()), settings)
 		e.Settings = aux
 	}*/
 	return e
 }
 
-func (m *endpointSettingsJSON) ToEndpointSettingsModel() (*endpointSettingsModel, diag.Diagnostics) {
-	settings, diags := types.MapValueFrom(context.TODO(), types.StringType, m.PgSettings)
+func (m *endpointSettingsJSON) ToEndpointSettingsModel(ctx context.Context) (*endpointSettingsModel, diag.Diagnostics) {
+	settings, diags := types.MapValueFrom(ctx, types.StringType, m.PgSettings)
 	return &endpointSettingsModel{
 		//Description: types.StringValue(m.Description),
 		PgSettings: settings,

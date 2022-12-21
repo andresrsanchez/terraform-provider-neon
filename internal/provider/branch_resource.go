@@ -41,7 +41,7 @@ type branchResourceJSON struct {
 	Endpoints        []endpointResourceJSON `json:"endpoints"`
 }
 
-func (in *branchResourceJSON) ToBranchResourceModel() (*BranchResourceModel, diag.Diagnostics) {
+func (in *branchResourceJSON) ToBranchResourceModel(ctx context.Context) (*BranchResourceModel, diag.Diagnostics) {
 	branch := &BranchResourceModel{
 		ID:               types.StringValue(in.ID),
 		ProjectID:        types.StringValue(in.ProjectID),
@@ -63,7 +63,7 @@ func (in *branchResourceJSON) ToBranchResourceModel() (*BranchResourceModel, dia
 		for _, v := range in.Endpoints {
 			e = append(e, *v.ToEndpointResourceModel())
 		}
-		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())}, e)
+		aux, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())}, e)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -72,8 +72,8 @@ func (in *branchResourceJSON) ToBranchResourceModel() (*BranchResourceModel, dia
 	return branch, nil
 }
 
-func (in *BranchResourceModel) ToBranchResourceObject() (types.Object, diag.Diagnostics) {
-	return types.ObjectValueFrom(context.TODO(), typeFromAttrs(branchResourceAttr()), in)
+func (in *BranchResourceModel) ToBranchResourceObject(ctx context.Context) (types.Object, diag.Diagnostics) {
+	return types.ObjectValueFrom(ctx, typeFromAttrs(branchResourceAttr()), in)
 }
 
 type BranchResourceModel struct {
@@ -232,16 +232,16 @@ func branchResourceEndpointAttr() map[string]schema.Attribute {
 	}
 }
 
-func toBranchJSON(in *types.Object) (*branchResourceJSON, diag.Diagnostics) {
+func toBranchJSON(in *types.Object, ctx context.Context) (*branchResourceJSON, diag.Diagnostics) {
 	v := BranchResourceModel{
 		Endpoints: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())}),
 	}
-	diags := in.As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+	diags := in.As(ctx, &v, basetypes.ObjectAsOptions{})
 	endpoints := []endpointResourceJSON{}
 	if !v.Endpoints.IsNull() {
 		for _, vv := range v.Endpoints.Elements() {
 			endpointModel := endpointResourceModel{}
-			diags := vv.(types.Object).As(context.TODO(), &endpointModel, basetypes.ObjectAsOptions{})
+			diags := vv.(types.Object).As(ctx, &endpointModel, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -304,7 +304,7 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	for _, vv := range data.Endpoints.Elements() {
 		endpoint := endpointResourceModel{}
-		diags := vv.(types.Object).As(context.TODO(), &endpoint, basetypes.ObjectAsOptions{})
+		diags := vv.(types.Object).As(ctx, &endpoint, basetypes.ObjectAsOptions{})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -334,7 +334,7 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 	branchJSON.Branch.Endpoints = branchJSON.Endpoints
-	branchObj, diags := branchJSON.Branch.ToBranchResourceModel()
+	branchObj, diags := branchJSON.Branch.ToBranchResourceModel(ctx)
 	//branchObj.Endpoints = types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())})
 	//branchObj, diags := toBranchModel(&branchJSON.Branch)
 	resp.Diagnostics.Append(diags...)
@@ -395,7 +395,7 @@ func (r branchResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	branchObj, diags := bodyBranch.Branch.ToBranchResourceModel()
+	branchObj, diags := bodyBranch.Branch.ToBranchResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -460,7 +460,7 @@ func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	branchModel, diags := branchJSON.Branch.ToBranchResourceModel()
+	branchModel, diags := branchJSON.Branch.ToBranchResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

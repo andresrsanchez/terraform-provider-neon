@@ -81,7 +81,7 @@ func newProjectResourceModel() *projectResourceModel {
 	}
 }
 
-func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, diag.Diagnostics) {
+func (p *projectResourceJSON) ToProjectResourceModel(ctx context.Context) (*projectResourceModel, diag.Diagnostics) {
 	m := newProjectResourceModel()
 	m.MaintenanceStartsAt = types.StringValue(p.Project.MaintenanceStartsAt)
 	m.ID = types.StringValue(p.Project.ID)
@@ -97,19 +97,19 @@ func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, d
 	m.UpdatedAt = types.StringValue(p.Project.UpdatedAt)
 
 	/*if p.Settings != nil {
-		pg, _ := types.MapValueFrom(context.TODO(), types.StringType, p.Settings.PgSettings)
+		pg, _ := types.MapValueFrom(ctx, types.StringType, p.Settings.PgSettings)
 		settings := endpointSettingsModel{
 			PgSettings: pg,
 		}
-		aux, _ := types.ObjectValueFrom(context.TODO(), typeFromAttrs(defaultSettingsResourceAttr()), settings)
+		aux, _ := types.ObjectValueFrom(ctx, typeFromAttrs(defaultSettingsResourceAttr()), settings)
 		m.Settings = aux
 	}*/
 	if p.Branch != nil {
-		branchModel, diags := p.Branch.ToBranchResourceModel()
+		branchModel, diags := p.Branch.ToBranchResourceModel(ctx)
 		if diags.HasError() {
 			return nil, diags
 		}
-		branchObj, diags := branchModel.ToBranchResourceObject()
+		branchObj, diags := branchModel.ToBranchResourceObject(ctx)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -122,7 +122,7 @@ func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, d
 				ConnectionURI: types.StringValue(v.ConnectionURI),
 			})
 		}
-		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}, c)
+		aux, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}, c)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -131,13 +131,13 @@ func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, d
 	if len(p.Roles) != 0 {
 		r := []types.Object{}
 		for _, v := range p.Roles {
-			aux, diags := toRoleModel(&v)
+			aux, diags := toRoleModel(&v, ctx)
 			if diags.HasError() {
 				return nil, diags
 			}
 			r = append(r, aux)
 		}
-		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
+		aux, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}, r)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -146,13 +146,13 @@ func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, d
 	if len(p.Databases) != 0 {
 		d := []types.Object{}
 		for _, v := range p.Databases {
-			aux, diags := toDatabaseModel(&v, p.Project.ID)
+			aux, diags := toDatabaseModel(&v, p.Project.ID, ctx)
 			if diags.HasError() {
 				return nil, diags
 			}
 			d = append(d, aux)
 		}
-		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
+		aux, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}, d)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -164,7 +164,7 @@ func (p *projectResourceJSON) ToProjectResourceModel() (*projectResourceModel, d
 			ee := *v.ToEndpointResourceModel()
 			e = append(e, ee)
 		}
-		aux, diags := types.ListValueFrom(context.TODO(), types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
+		aux, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: typeFromAttrs(endpointResourceAttr())}, e)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -179,7 +179,7 @@ func typeFromAttrs(in map[string]schema.Attribute) map[string]attr.Type {
 	}
 	return out
 }
-func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, diag.Diagnostics) {
+func (m *projectResourceModel) ToProjectResourceJSON(ctx context.Context) (*projectResourceJSON, diag.Diagnostics) {
 	p := &projectResourceJSON{
 		Project: innerProjectResourceJSON{
 			MaintenanceStartsAt:   m.MaintenanceStartsAt.ValueString(),
@@ -198,11 +198,11 @@ func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, di
 	}
 	/*if !m.Settings.IsNull() {
 		v := endpointSettingsModel{}
-		m.Settings.As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+		m.Settings.As(ctx, &v, basetypes.ObjectAsOptions{})
 		p.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	if !m.Branch.IsNull() {
-		aux, diags := toBranchJSON(&m.Branch)
+		aux, diags := toBranchJSON(&m.Branch, ctx)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -212,7 +212,7 @@ func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, di
 		p.ConnectionUris = []projectConnUrisJSON{}
 		for _, vv := range m.ConnectionUris.Elements() {
 			v := projectConnUrisModel{}
-			diags := vv.(types.Object).As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+			diags := vv.(types.Object).As(ctx, &v, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -225,7 +225,7 @@ func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, di
 		p.Roles = []roleResourceJSON{}
 		for _, vv := range m.Roles.Elements() {
 			roleObj := vv.(types.Object)
-			role, diags := toRoleJSON(&roleObj)
+			role, diags := toRoleJSON(&roleObj, ctx)
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -236,7 +236,7 @@ func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, di
 		p.Databases = []databaseResourceJSON{}
 		for _, vv := range m.Databases.Elements() {
 			databaseObj := vv.(types.Object)
-			aux, diags := toDatabaseJSON(&databaseObj)
+			aux, diags := toDatabaseJSON(&databaseObj, ctx)
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -247,7 +247,7 @@ func (m *projectResourceModel) ToProjectResourceJSON() (*projectResourceJSON, di
 		p.Endpoints = []endpointResourceJSON{}
 		for _, vv := range m.Endpoints.Elements() {
 			v := endpointResourceModel{}
-			diags := vv.(types.Object).As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+			diags := vv.(types.Object).As(ctx, &v, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}

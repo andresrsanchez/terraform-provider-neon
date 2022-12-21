@@ -65,9 +65,9 @@ func roleResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toRoleJSON(in *types.Object) (*roleResourceJSON, diag.Diagnostics) {
+func toRoleJSON(in *types.Object, ctx context.Context) (*roleResourceJSON, diag.Diagnostics) {
 	v := roleResourceModel{}
-	diags := in.As(context.TODO(), &in, basetypes.ObjectAsOptions{})
+	diags := in.As(ctx, &in, basetypes.ObjectAsOptions{})
 	return &roleResourceJSON{
 		BranchID:  v.BranchID.ValueString(),
 		Name:      v.Name.ValueString(),
@@ -78,7 +78,7 @@ func toRoleJSON(in *types.Object) (*roleResourceJSON, diag.Diagnostics) {
 	}, diags
 }
 
-func toRoleModel(v *roleResourceJSON) (types.Object, diag.Diagnostics) {
+func toRoleModel(v *roleResourceJSON, ctx context.Context) (types.Object, diag.Diagnostics) {
 	db := roleResourceModel{
 		BranchID:  types.StringValue(v.BranchID),
 		Name:      types.StringValue(v.Name),
@@ -87,7 +87,7 @@ func toRoleModel(v *roleResourceJSON) (types.Object, diag.Diagnostics) {
 		CreatedAt: types.StringValue(v.CreatedAt),
 		UpdatedAt: types.StringValue(v.UpdatedAt),
 	}
-	return types.ObjectValueFrom(context.TODO(), typeFromAttrs(roleResourceAttr()), db)
+	return types.ObjectValueFrom(ctx, typeFromAttrs(roleResourceAttr()), db)
 }
 
 func (r roleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -133,7 +133,7 @@ func (r roleResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	roleObj, diags := toRoleModel(&inner.Role)
+	roleObj, diags := toRoleModel(&inner.Role, ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -185,7 +185,7 @@ func (r roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	roleObj, diags := toRoleModel(&inner.Role)
+	roleObj, diags := toRoleModel(&inner.Role, ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?
@@ -220,7 +220,7 @@ func (r roleResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	roleObj, diags := toRoleModel(&inner.Role)
+	roleObj, diags := toRoleModel(&inner.Role, ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		//what should i do?

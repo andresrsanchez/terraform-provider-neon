@@ -212,7 +212,7 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	//tflog.Trace(ctx, "created a resource")
-	plan, diags := inner.ToProjectResourceModel()
+	plan, diags := inner.ToProjectResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -261,7 +261,7 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	plan, diags := project.ToProjectResourceModel()
+	plan, diags := project.ToProjectResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -295,7 +295,7 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	/*if !data.Settings.IsNull() {
 		v := endpointSettingsModel{}
-		data.Settings.As(context.TODO(), &v, basetypes.ObjectAsOptions{})
+		data.Settings.As(ctx, &v, basetypes.ObjectAsOptions{})
 		u.Settings = v.ToEndpointSettingsJSON()
 	}*/
 	content := struct {
@@ -317,7 +317,7 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	plan, diags := project.ToProjectResourceModel()
+	plan, diags := project.ToProjectResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
