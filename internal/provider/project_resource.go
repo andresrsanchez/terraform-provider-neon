@@ -11,6 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -113,28 +116,33 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: roleResourceAttr(),
 				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"databases": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: databaseResourceAttr(),
 				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"branch": schema.SingleNestedAttribute{
-				Computed:   true,
-				Attributes: branchResourceAttr(),
+				Computed:      true,
+				Attributes:    branchResourceAttr(),
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 			},
 			"connection_uris": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: connectionUriResourceAttr(),
 				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"endpoints": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: endpointResourceAttr(),
 				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 		},
 		Description:         "",
@@ -242,7 +250,6 @@ func (r projectResource) Metadata(ctx context.Context, req resource.MetadataRequ
 
 // Read implements resource.Resource
 func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	fmt.Println("hola1")
 	data := newProjectResourceModel()
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -261,6 +268,7 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
+
 	plan, diags := project.ToProjectResourceModel(ctx)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
@@ -271,7 +279,7 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 type updateProject struct {
-	Name string `tfsdk:"name"`
+	Name string `json:"name"`
 	//Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
 	Autoscaling_limit_min_cu int64 `json:"autoscaling_limit_min_cu,omitempty"`
 	Autoscaling_limit_max_cu int64 `json:"autoscaling_limit_max_cu,omitempty"`
@@ -279,15 +287,20 @@ type updateProject struct {
 
 // Update implements resource.Resource
 func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	fmt.Println("hola2")
 	data := newProjectResourceModel()
-
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	var ID types.String
+	diags = req.State.GetAttribute(ctx, path.Root("id"), &ID)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	u := updateProject{
 		Autoscaling_limit_min_cu: data.AutoscalingLimitMinCu.ValueInt64(),
 		Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
@@ -305,7 +318,7 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	response, err := r.client.R().
 		SetBody(content).
-		Patch(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
+		Patch(fmt.Sprintf("/projects/%s", ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -327,6 +340,5 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 }
 
 func (r projectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	fmt.Println("hola3")
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

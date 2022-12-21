@@ -14,7 +14,7 @@ func TestProjectResource(t *testing.T) {
 			// Create and Read testing
 			{
 				//Destroy: true,
-				Config: testNeonProjectResourceBasic(),
+				Config: testProjectCreateResource(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("neon_project.test", "name", "name"),
 					resource.TestCheckResourceAttr("neon_project.test", "engine", "k8s-pod"),
@@ -24,35 +24,38 @@ func TestProjectResource(t *testing.T) {
 				),
 			},
 			// ImportState testing
-			/*{
-				ResourceName:      "scaffolding_example.test",
+			{
+				ResourceName:      "neon_project.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				// This is not normally necessary, but is here because this
-				// example code does not have an actual upstream service.
-				// Once the Read method is able to refresh information from
-				// the upstream service, this can be removed.
-				ImportStateVerifyIgnore: []string{"configurable_attribute"},
-			},*/
+			},
 			// Update and Read testing
-			/*{
-				Config: testNeonEndpointResourceConfig1(),
+			{
+				Config: testProjectUpdateResource(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("scaffolding_example.test", "configurable_attribute", "two"),
+					resource.TestCheckResourceAttr("neon_project.test", "name", "name_updated"),
 				),
-			},*/
+			},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
 }
 
-func testNeonProjectResourceBasic() string {
+func testProjectCreateResource() string {
 	return `
 resource "neon_project" "test" {
 	name = "name"
 	engine = "k8s-pod"
 	region_id = "aws-us-east-2"
 	pg_version = 14	
+}
+`
+}
+
+func testProjectUpdateResource() string {
+	return `
+resource "neon_project" "test" {
+	name = "name_updated"
 }
 `
 }
