@@ -134,7 +134,6 @@ type createEndpoint struct {
 }
 
 func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	fmt.Println("hi2")
 	var data endpointResourceModel
 
 	diags := req.Plan.Get(ctx, &data)
@@ -157,17 +156,17 @@ func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest
 	/*if data.Settings != nil {
 		content.Settings = data.Settings.ToEndpointSettingsJSON()
 	}*/
-	response, err := r.client.R().
+	response, _ := r.client.R().
 		SetBody(content).
 		Post(fmt.Sprintf("/projects/%s/endpoints", data.ProjectID.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 	endpoint := struct {
 		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
-	err = json.Unmarshal(response.Body(), &endpoint)
+	err := json.Unmarshal(response.Body(), &endpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -191,16 +190,16 @@ func (r endpointResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Get(fmt.Sprintf("/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 
 	endpoint := struct {
 		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
-	err = json.Unmarshal(response.Body(), &endpoint)
+	err := json.Unmarshal(response.Body(), &endpoint)
 	data = *endpoint.Endpoint.ToEndpointResourceModel()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
@@ -247,18 +246,18 @@ func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest
 	/*if !data.Settings.Description.IsUnknown() {
 		content.Settings = data.Settings.ToEndpointSettingsJSON()
 	}*/
-	response, err := r.client.R().
+	response, _ := r.client.R().
 		SetBody(content).
 		Patch(fmt.Sprintf("/projects/%s/endpoints", data.ProjectID.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 
 	endpoint := struct {
 		Endpoint endpointResourceJSON `json:"endpoint"`
 	}{}
-	err = json.Unmarshal(response.Body(), &endpoint)
+	err := json.Unmarshal(response.Body(), &endpoint)
 	data = *endpoint.Endpoint.ToEndpointResourceModel()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
@@ -278,9 +277,9 @@ func (r endpointResource) Delete(ctx context.Context, req resource.DeleteRequest
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 
-	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Delete(fmt.Sprintf("/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 	resp.State.RemoveResource(ctx)

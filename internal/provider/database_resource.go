@@ -121,11 +121,11 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 		},
 	}
 	url := fmt.Sprintf("/projects/%s/branches/%s/databases", data.ProjectID.ValueString(), data.BranchID.ValueString())
-	response, err := r.client.R().
+	response, _ := r.client.R().
 		SetBody(content).
 		Post(url)
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 
@@ -134,7 +134,7 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 	}{
 		Database: databaseResourceJSON{},
 	}
-	err = json.Unmarshal(response.Body(), &inner)
+	err := json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -157,9 +157,9 @@ func (r databaseResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Delete(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 	resp.State.RemoveResource(ctx)
@@ -176,9 +176,9 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 	inner := struct {
@@ -186,7 +186,7 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}{
 		Database: databaseResourceJSON{},
 	}
-	err = json.Unmarshal(response.Body(), &inner)
+	err := json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -229,11 +229,11 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 			OwnerName: data.OwnerName.ValueString(),
 		},
 	}
-	response, err := r.client.R().
+	response, _ := r.client.R().
 		SetBody(content).
 		Patch(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", state.ProjectID.ValueString(), state.BranchID.ValueString(), state.Name.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 
@@ -242,7 +242,7 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	}{
 		Database: databaseResourceJSON{},
 	}
-	err = json.Unmarshal(response.Body(), &inner)
+	err := json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return

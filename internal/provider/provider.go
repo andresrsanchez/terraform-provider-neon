@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -50,8 +49,8 @@ func (provider *neon) Configure(ctx context.Context, req provider.ConfigureReque
 		}).
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).
-		SetRetryWaitTime(10 * time.Second).
-		SetError(fmt.Errorf("generic error"))
+		SetRetryWaitTime(10 * time.Second)
+	//SetError(fmt.Errorf("generic error"))
 }
 
 func (p neon) Resources(ctx context.Context) []func() resource.Resource {
@@ -73,6 +72,11 @@ func (p neon) Resources(ctx context.Context) []func() resource.Resource {
 		},
 		func() resource.Resource {
 			return &databaseResource{
+				client: p.client,
+			}
+		},
+		func() resource.Resource {
+			return &roleResource{
 				client: p.client,
 			}
 		},

@@ -184,8 +184,8 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 	response, err := r.client.R().
 		SetBody(content).
 		Post("/projects")
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 
@@ -198,9 +198,9 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	if len(inner.Endpoints) > 0 {
 		var isEndpointReady bool
-		response, err = r.client.R().AddRetryCondition(func(r *resty.Response, err error) bool {
-			if err != nil || r.StatusCode() > 399 {
-				return true
+		response, _ = r.client.R().AddRetryCondition(func(r *resty.Response, e error) bool {
+			if r.IsError() || e != nil {
+				return false
 			}
 			endpoint := struct {
 				Endpoint endpointResourceJSON `json:"endpoint"`
@@ -213,8 +213,8 @@ func (r projectResource) Create(ctx context.Context, req resource.CreateRequest,
 			return isEndpointReady
 		}).
 			Get(fmt.Sprintf("/projects/%s/endpoints/%s", inner.Project.ID, inner.Endpoints[0].Id)) //review
-		if err != nil {
-			resp.Diagnostics.AddError(fmt.Sprintf("Cannot get endpoint status with a status code: %s", response.Status()), err.Error())
+		if response.IsError() {
+			resp.Diagnostics.AddError(fmt.Sprintf("Cannot get endpoint status with a status code: %s", response.Status()), "")
 			return
 		}
 	}
@@ -235,9 +235,9 @@ func (r projectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 
-	response, err := r.client.R().Delete(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Delete(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 	resp.State.RemoveResource(ctx)
@@ -257,13 +257,13 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
+	response, _ := r.client.R().Get(fmt.Sprintf("/projects/%s", data.ID.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
 	}
 	project := &projectResourceJSON{}
-	err = json.Unmarshal(response.Body(), &project)
+	err := json.Unmarshal(response.Body(), &project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
@@ -316,16 +316,16 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}{
 		Project: u,
 	}
-	response, err := r.client.R().
+	response, _ := r.client.R().
 		SetBody(content).
 		Patch(fmt.Sprintf("/projects/%s", ID.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 
 	project := &projectResourceJSON{}
-	err = json.Unmarshal(response.Body(), &project)
+	err := json.Unmarshal(response.Body(), &project)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return

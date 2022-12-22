@@ -131,7 +131,7 @@ func (p *projectResourceJSON) ToProjectResourceModel(ctx context.Context) (*proj
 	if len(p.Roles) != 0 {
 		r := []types.Object{}
 		for _, v := range p.Roles {
-			aux, diags := toRoleModel(&v, ctx)
+			aux, diags := toRoleModel(&v, ctx, p.Project.ID)
 			if diags.HasError() {
 				return nil, diags
 			}
