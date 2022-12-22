@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -94,6 +95,7 @@ type BranchResourceModel struct {
 }
 
 var _ resource.Resource = branchResource{}
+var _ resource.ResourceWithImportState = branchResource{}
 
 func branchResourceAttr() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
@@ -281,7 +283,6 @@ type createBranchInner struct {
 }
 
 func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	fmt.Println("Create")
 	var data BranchResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -335,8 +336,6 @@ func (r branchResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 	branchJSON.Branch.Endpoints = branchJSON.Endpoints
 	branchObj, diags := branchJSON.Branch.ToBranchResourceModel(ctx)
-	//branchObj.Endpoints = types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())})
-	//branchObj, diags := toBranchModel(&branchJSON.Branch)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -370,19 +369,13 @@ func (r branchResource) Metadata(ctx context.Context, req resource.MetadataReque
 }
 
 func (r branchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var projectID, ID types.String
-	diags := req.State.GetAttribute(ctx, path.Root("project_id"), &projectID)
+	var data BranchResourceModel
+	diags := req.State.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	diags = req.State.GetAttribute(ctx, path.Root("id"), &ID)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s", projectID.ValueString(), ID.ValueString()))
+	response, err := r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s", data.ProjectID.ValueString(), data.ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -401,7 +394,7 @@ func (r branchResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	response, err = r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/endpoints", projectID.ValueString(), ID.ValueString()))
+	response, err = r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/endpoints", data.ProjectID.ValueString(), data.ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -432,7 +425,6 @@ func (r branchResource) Read(ctx context.Context, req resource.ReadRequest, resp
 }
 
 func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	fmt.Println("Update")
 	var data BranchResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -440,14 +432,26 @@ func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	var state BranchResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	content := struct {
-		Name string `json:"name"`
+		Branch struct {
+			Name string `json:"name"`
+		} `json:"branch"`
 	}{
-		Name: data.Name.ValueString(),
+		Branch: struct {
+			Name string `json:"name"`
+		}{
+			Name: data.Name.ValueString(),
+		},
 	}
 	response, err := r.client.R().
 		SetBody(content).
-		Patch(fmt.Sprintf("/projects/%s/branches/%s", data.ProjectID.ValueString(), data.ID.ValueString()))
+		Patch(fmt.Sprintf("/projects/%s/branches/%s", state.ProjectID.ValueString(), state.ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -466,7 +470,7 @@ func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	response, err = r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/endpoints", data.ProjectID.ValueString(), data.ID.ValueString()))
+	response, err = r.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/endpoints", state.ProjectID.ValueString(), state.ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -493,4 +497,16 @@ func (r branchResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 	diags = resp.State.Set(ctx, branchModel)
 	resp.Diagnostics.Append(diags...)
+}
+
+func (r branchResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	ids := strings.Split(req.ID, "/")
+	if len(ids) != 2 || ids[0] == "" || ids[1] == "" {
+		resp.Diagnostics.AddError(
+			"Cannot import branch",
+			fmt.Sprintf("Invalid id '%s' specified. should be in format \"id/project_id\"", req.ID),
+		)
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), ids[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), ids[1])...)
 }
