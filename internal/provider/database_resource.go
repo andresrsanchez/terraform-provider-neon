@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
+	"strings"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -100,7 +100,6 @@ func (r databaseResource) Schema(ctx context.Context, req resource.SchemaRequest
 }
 
 func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	fmt.Println("HI HEREEEE")
 	var data databaseResourceModel
 	diags := req.Plan.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -124,17 +123,11 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 	url := fmt.Sprintf("/projects/%s/branches/%s/databases", data.ProjectID.ValueString(), data.BranchID.ValueString())
 	response, err := r.client.R().
 		SetBody(content).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			fmt.Println("im retrying at" + time.Now().String())
-			return err != nil || r.StatusCode() == 423
-		}).
 		Post(url)
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
 	}
-
-	fmt.Println("  Status     :", response.Status())
 
 	inner := struct {
 		Database databaseResourceJSON `json:"database"`
@@ -215,6 +208,13 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	var state databaseResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	content := struct {
 		Database struct {
 			Name      string `json:"name"`
@@ -231,7 +231,7 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	response, err := r.client.R().
 		SetBody(content).
-		Patch(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", data.ProjectID.ValueString(), data.BranchID.ValueString(), data.Name.ValueString()))
+		Patch(fmt.Sprintf("/projects/%s/branches/%s/databases/%s", state.ProjectID.ValueString(), state.BranchID.ValueString(), state.Name.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), err.Error())
 		return
@@ -258,5 +258,14 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r databaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	ids := strings.Split(req.ID, "/")
+	if len(ids) != 3 || ids[0] == "" || ids[1] == "" || ids[2] == "" {
+		resp.Diagnostics.AddError(
+			"Cannot import branch",
+			fmt.Sprintf("Invalid id '%s' specified. should be in format \"project_id/branch_id/name\"", req.ID),
+		)
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), ids[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("branch_id"), ids[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), ids[2])...)
 }

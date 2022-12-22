@@ -45,6 +45,9 @@ func (provider *neon) Configure(ctx context.Context, req provider.ConfigureReque
 		SetBaseURL("https://console.neon.tech/api/v2").
 		SetAuthToken(key).
 		SetHeader("Content-Type", "application/json").
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			return err == nil && r.StatusCode() == 423
+		}).
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(10 * time.Second).
