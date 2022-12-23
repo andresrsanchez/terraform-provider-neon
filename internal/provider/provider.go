@@ -8,7 +8,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
-	lol "github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
@@ -27,7 +27,7 @@ func (p *neon) Metadata(ctx context.Context, req provider.MetadataRequest, resp 
 }
 
 func (p *neon) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
-	resp.Schema = lol.Schema{}
+	resp.Schema = schema.Schema{}
 }
 
 func (provider *neon) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
@@ -45,7 +45,7 @@ func (provider *neon) Configure(ctx context.Context, req provider.ConfigureReque
 		SetAuthToken(key).
 		SetHeader("Content-Type", "application/json").
 		AddRetryCondition(func(r *resty.Response, err error) bool {
-			return err == nil && r.StatusCode() == 423
+			return err == nil && (r.StatusCode() == 423 || r.StatusCode() == 523)
 		}).
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).

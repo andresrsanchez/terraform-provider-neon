@@ -229,11 +229,7 @@ func branchResourceEndpointAttr() map[string]schema.Attribute {
 	}
 }
 
-func toBranchJSON(in *types.Object, ctx context.Context) (*branchResourceJSON, diag.Diagnostics) {
-	v := BranchResourceModel{
-		Endpoints: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())}),
-	}
-	diags := in.As(ctx, &v, basetypes.ObjectAsOptions{})
+func (v *BranchResourceModel) toBranchJSON(ctx context.Context) (*branchResourceJSON, diag.Diagnostics) {
 	endpoints := []endpointResourceJSON{}
 	if !v.Endpoints.IsNull() {
 		for _, vv := range v.Endpoints.Elements() {
@@ -261,7 +257,7 @@ func toBranchJSON(in *types.Object, ctx context.Context) (*branchResourceJSON, d
 		LogicalSizeLimit: v.LogicalSizeLimit.ValueInt64(),
 		PhysicalSize:     v.PhysicalSize.ValueInt64(),
 		Endpoints:        endpoints,
-	}, diags
+	}, nil
 }
 
 func (r branchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {

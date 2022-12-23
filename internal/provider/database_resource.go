@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type databaseResource struct {
@@ -66,9 +65,7 @@ func databaseResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toDatabaseJSON(v *types.Object, ctx context.Context) (*databaseResourceJSON, diag.Diagnostics) {
-	in := databaseResourceModel{}
-	diags := v.As(ctx, &in, basetypes.ObjectAsOptions{})
+func (in *databaseResourceModel) toDatabaseJSON(ctx context.Context) *databaseResourceJSON {
 	return &databaseResourceJSON{
 		ID:        in.ID.ValueInt64(),
 		BranchID:  in.BranchID.ValueString(),
@@ -77,10 +74,10 @@ func toDatabaseJSON(v *types.Object, ctx context.Context) (*databaseResourceJSON
 		CreatedAt: in.CreatedAt.ValueString(),
 		UpdatedAt: in.UpdatedAt.ValueString(),
 		ProjectID: in.ProjectID.ValueString(),
-	}, diags
+	}
 }
 
-func toDatabaseModel(in *databaseResourceJSON, projectID string, ctx context.Context) (types.Object, diag.Diagnostics) {
+func (in *databaseResourceJSON) toDatabaseModel(ctx context.Context, projectID string) (types.Object, diag.Diagnostics) {
 	db := databaseResourceModel{
 		ID:        types.Int64Value(in.ID),
 		BranchID:  types.StringValue(in.BranchID),
@@ -140,7 +137,7 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
+	databaseObj, diags := inner.Database.toDatabaseModel(ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -190,7 +187,7 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
+	databaseObj, diags := inner.Database.toDatabaseModel(ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -245,7 +242,7 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
+	databaseObj, diags := inner.Database.toDatabaseModel(ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

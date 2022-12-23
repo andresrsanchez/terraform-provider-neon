@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type roleResource struct {
@@ -65,9 +64,7 @@ func roleResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func toRoleJSON(in *types.Object, ctx context.Context) (*roleResourceJSON, diag.Diagnostics) {
-	v := roleResourceModel{}
-	diags := in.As(ctx, &in, basetypes.ObjectAsOptions{})
+func (v *roleResourceModel) toRoleJSON(ctx context.Context) *roleResourceJSON {
 	return &roleResourceJSON{
 		BranchID:  v.BranchID.ValueString(),
 		Name:      v.Name.ValueString(),
@@ -75,10 +72,10 @@ func toRoleJSON(in *types.Object, ctx context.Context) (*roleResourceJSON, diag.
 		CreatedAt: v.UpdatedAt.ValueString(),
 		UpdatedAt: v.UpdatedAt.ValueString(),
 		ProjectID: v.ProjectID.ValueString(),
-	}, diags
+	}
 }
 
-func toRoleModel(v *roleResourceJSON, ctx context.Context, project_id string) (types.Object, diag.Diagnostics) {
+func (v *roleResourceJSON) toRoleModel(ctx context.Context, project_id string) (types.Object, diag.Diagnostics) {
 	db := roleResourceModel{
 		BranchID:  types.StringValue(v.BranchID),
 		Name:      types.StringValue(v.Name),
@@ -133,7 +130,7 @@ func (r roleResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	roleObj, diags := toRoleModel(&inner.Role, ctx, data.ProjectID.ValueString())
+	roleObj, diags := inner.Role.toRoleModel(ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -176,15 +173,13 @@ func (r roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 	inner := struct {
 		Role roleResourceJSON `json:"role"`
-	}{
-		Role: roleResourceJSON{},
-	}
+	}{}
 	err := json.Unmarshal(response.Body(), &inner)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
 		return
 	}
-	roleObj, diags := toRoleModel(&inner.Role, ctx, data.ProjectID.ValueString())
+	roleObj, diags := inner.Role.toRoleModel(ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

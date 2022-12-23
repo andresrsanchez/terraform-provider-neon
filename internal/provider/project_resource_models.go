@@ -117,7 +117,7 @@ func (p *projectResourceJSON) ToProjectResourceModel(ctx context.Context) (*proj
 	if len(p.Roles) != 0 {
 		r := []types.Object{}
 		for _, v := range p.Roles {
-			aux, diags := toRoleModel(&v, ctx, p.Project.ID)
+			aux, diags := v.toRoleModel(ctx, p.Project.ID)
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -132,7 +132,7 @@ func (p *projectResourceJSON) ToProjectResourceModel(ctx context.Context) (*proj
 	if len(p.Databases) != 0 {
 		d := []types.Object{}
 		for _, v := range p.Databases {
-			aux, diags := toDatabaseModel(&v, p.Project.ID, ctx)
+			aux, diags := v.toDatabaseModel(ctx, p.Project.ID)
 			if diags.HasError() {
 				return nil, diags
 			}
@@ -183,7 +183,14 @@ func (m *projectResourceModel) ToProjectResourceJSON(ctx context.Context) (*proj
 		},
 	}
 	if !m.Branch.IsNull() {
-		aux, diags := toBranchJSON(&m.Branch, ctx)
+		v := BranchResourceModel{
+			Endpoints: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(branchResourceEndpointAttr())}), //not necessary?
+		}
+		diags := m.Branch.As(ctx, &v, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, diags
+		}
+		aux, diags := v.toBranchJSON(ctx)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -206,22 +213,24 @@ func (m *projectResourceModel) ToProjectResourceJSON(ctx context.Context) (*proj
 		p.Roles = []roleResourceJSON{}
 		for _, vv := range m.Roles.Elements() {
 			roleObj := vv.(types.Object)
-			role, diags := toRoleJSON(&roleObj, ctx)
+			v := roleResourceModel{}
+			diags := roleObj.As(ctx, &v, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
-			p.Roles = append(p.Roles, *role)
+			p.Roles = append(p.Roles, *v.toRoleJSON(ctx))
 		}
 	}
 	if !m.Databases.IsNull() {
 		p.Databases = []databaseResourceJSON{}
 		for _, vv := range m.Databases.Elements() {
 			databaseObj := vv.(types.Object)
-			aux, diags := toDatabaseJSON(&databaseObj, ctx)
+			v := databaseResourceModel{}
+			diags := databaseObj.As(ctx, &v, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
-			p.Databases = append(p.Databases, *aux)
+			p.Databases = append(p.Databases, *v.toDatabaseJSON(ctx))
 		}
 	}
 	if m.Endpoints.IsNull() {
