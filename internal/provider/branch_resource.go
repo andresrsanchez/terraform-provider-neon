@@ -146,11 +146,6 @@ func branchResourceAttr() map[string]schema.Attribute {
 				Attributes: branchResourceEndpointAttr(),
 			},
 			Optional: true,
-			//Computed: true,
-			//Required: true,
-			// PlanModifiers: []planmodifier.List{
-			// 	listplanmodifier.UseStateForUnknown(),
-			// },
 		},
 	}
 }

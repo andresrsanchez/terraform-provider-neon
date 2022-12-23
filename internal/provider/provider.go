@@ -84,7 +84,23 @@ func (p neon) Resources(ctx context.Context) []func() resource.Resource {
 }
 
 func (p neon) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		func() datasource.DataSource {
+			return &projectDataSource{
+				client: p.client,
+			}
+		},
+		func() datasource.DataSource {
+			return &branchDataSource{
+				client: p.client,
+			}
+		},
+		func() datasource.DataSource {
+			return &databaseDataSource{
+				client: p.client,
+			}
+		},
+	}
 }
 
 func New(version string) func() provider.Provider {
