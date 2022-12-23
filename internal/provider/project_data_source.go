@@ -113,7 +113,6 @@ func (*projectDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 				Computed:            true,
 				Validators:          []validator.Int64{int64validator.Any(int64validator.OneOf(14), int64validator.OneOf(15))},
 			},
-			//validate dates
 			"last_active": schema.StringAttribute{
 				MarkdownDescription: "last active",
 				Computed:            true,

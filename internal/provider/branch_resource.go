@@ -213,7 +213,6 @@ func branchResourceEndpointAttr() map[string]schema.Attribute {
 			MarkdownDescription: "passwordless access",
 			Computed:            true,
 		},
-		//validate dates
 		"last_active": schema.StringAttribute{
 			MarkdownDescription: "last active",
 			Computed:            true,

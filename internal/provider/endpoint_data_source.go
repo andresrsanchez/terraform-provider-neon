@@ -173,7 +173,6 @@ func (*endpointDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				MarkdownDescription: "passwordless access",
 				Computed:            true,
 			},
-			//validate dates
 			"last_active": schema.StringAttribute{
 				MarkdownDescription: "last active",
 				Computed:            true,

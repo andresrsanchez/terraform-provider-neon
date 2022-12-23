@@ -85,7 +85,6 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Computed:            true,
 				Validators:          []validator.Int64{int64validator.Any(int64validator.OneOf(14), int64validator.OneOf(15))},
 			},
-			//validate dates
 			"last_active": schema.StringAttribute{
 				MarkdownDescription: "last active",
 				Computed:            true,
@@ -139,13 +138,12 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 }
 
 type createProject struct {
-	Name        string `json:"name,omitempty"`
-	Provisioner string `json:"provisioner,omitempty"`
-	RegionID    string `json:"region_id,omitempty"`
-	PgVersion   int64  `json:"pg_version,omitempty"`
-	//Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
-	Autoscaling_limit_min_cu int64 `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64 `json:"autoscaling_limit_max_cu,omitempty"`
+	Name                     string `json:"name,omitempty"`
+	Provisioner              string `json:"provisioner,omitempty"`
+	RegionID                 string `json:"region_id,omitempty"`
+	PgVersion                int64  `json:"pg_version,omitempty"`
+	Autoscaling_limit_min_cu int64  `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64  `json:"autoscaling_limit_max_cu,omitempty"`
 }
 
 func (r projectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -266,10 +264,9 @@ func (r projectResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 type updateProject struct {
-	Name string `json:"name"`
-	//Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
-	Autoscaling_limit_min_cu int64 `json:"autoscaling_limit_min_cu,omitempty"`
-	Autoscaling_limit_max_cu int64 `json:"autoscaling_limit_max_cu,omitempty"`
+	Name                     string `json:"name"`
+	Autoscaling_limit_min_cu int64  `json:"autoscaling_limit_min_cu,omitempty"`
+	Autoscaling_limit_max_cu int64  `json:"autoscaling_limit_max_cu,omitempty"`
 }
 
 // Update implements resource.Resource

@@ -185,7 +185,6 @@ func endpointResourceAttr() map[string]schema.Attribute {
 			Computed:            true,
 			Optional:            true,
 		},
-		//validate dates
 		"last_active": schema.StringAttribute{
 			MarkdownDescription: "last active",
 			Computed:            true,
