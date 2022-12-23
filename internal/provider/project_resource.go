@@ -33,28 +33,9 @@ func connectionUriResourceAttr() map[string]schema.Attribute {
 	}
 }
 
-func defaultSettingsResourceAttr() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		/*"description": schema.StringAttribute{
-			Required: true,
-		},*/
-		"pg_settings": schema.MapAttribute{
-			Computed:    true,
-			Optional:    true,
-			ElementType: types.StringType,
-		},
-	}
-}
-
-//migrate to projectattrs()
 func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			/*"settings": schema.SingleNestedAttribute{
-				Attributes: defaultSettingsResourceAttr(),
-				Optional:   true,
-				Computed:   true,
-			},*/
 			"autoscaling_limit_min_cu": schema.Int64Attribute{
 				MarkdownDescription: "autoscaling limit min",
 				Computed:            true,
@@ -306,11 +287,6 @@ func (r projectResource) Update(ctx context.Context, req resource.UpdateRequest,
 		Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
 		Name:                     data.Name.ValueString(),
 	}
-	/*if !data.Settings.IsNull() {
-		v := endpointSettingsModel{}
-		data.Settings.As(ctx, &v, basetypes.ObjectAsOptions{})
-		u.Settings = v.ToEndpointSettingsJSON()
-	}*/
 	content := struct {
 		Project updateProject `json:"project"`
 	}{

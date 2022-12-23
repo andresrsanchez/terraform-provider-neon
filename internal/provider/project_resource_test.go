@@ -59,35 +59,3 @@ resource "neon_project" "test" {
 }
 `
 }
-
-//	Provisioner              string                `json:"provisioner,omitempty"`
-//	RegionID                 string                `json:"region_id,omitempty"`
-//	PgVersion                int64                 `json:"pg_version,omitempty"`
-//	Settings                 *endpointSettingsJSON `json:"settings,omitempty"`
-//	Autoscaling_limit_min_cu int64                 `json:"autoscaling_limit_min_cu,omitempty"`
-//	Autoscaling_limit_max_cu int64                 `json:"autoscaling_limit_max_cu,omitempty"`
-
-/*func testNeonProjectResourceComplex_1() string {
-	return `
-provider "neon" {}
-resource "neon_endpoint" "test" {
-	branch_id = "branch"
-	type = "read_write"
-	project_id = "project"
-	settings = {
-		description = "first_description"
-		pg_settings = [{
-			description = "second_description"
-			test_setting = "test_first_setting"
-		}, {
-			description = "third_description"
-			test_setting = "test_second_setting"
-		}]
-	}
-	pooler_enabled = false
-	pooler_mode = "transaction"
-	disabled = false
-	passwordless_access = true
-}
-`
-}*/

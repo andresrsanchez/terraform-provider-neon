@@ -45,18 +45,13 @@ type projectConnUrisModel struct {
 	ConnectionURI types.String `tfsdk:"connection_uri"`
 }
 
-type endpointSettingsModel struct {
-	//Description types.String `tfsdk:"description"`
-	PgSettings types.Map `tfsdk:"pg_settings"`
-}
 type projectResourceModel struct {
-	MaintenanceStartsAt types.String `tfsdk:"maintenance_starts_at"`
-	ID                  types.String `tfsdk:"id"`
-	PlatformID          types.String `tfsdk:"platform_id"`
-	RegionID            types.String `tfsdk:"region_id"`
-	Name                types.String `tfsdk:"name"`
-	Provisioner         types.String `tfsdk:"engine"`
-	//Settings              types.Object `tfsdk:"settings"`
+	MaintenanceStartsAt   types.String `tfsdk:"maintenance_starts_at"`
+	ID                    types.String `tfsdk:"id"`
+	PlatformID            types.String `tfsdk:"platform_id"`
+	RegionID              types.String `tfsdk:"region_id"`
+	Name                  types.String `tfsdk:"name"`
+	Provisioner           types.String `tfsdk:"engine"`
 	PgVersion             types.Int64  `tfsdk:"pg_version"`
 	AutoscalingLimitMinCu types.Int64  `tfsdk:"autoscaling_limit_min_cu"`
 	AutoscalingLimitMaxCu types.Int64  `tfsdk:"autoscaling_limit_max_cu"`
@@ -72,7 +67,6 @@ type projectResourceModel struct {
 
 func newProjectResourceModel() *projectResourceModel {
 	return &projectResourceModel{
-		//Settings:       types.ObjectNull(typeFromAttrs(defaultSettingsResourceAttr())),
 		ConnectionUris: types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(connectionUriResourceAttr())}),
 		Roles:          types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(roleResourceAttr())}),
 		Databases:      types.ListNull(types.ObjectType{AttrTypes: typeFromAttrs(databaseResourceAttr())}),
@@ -96,14 +90,6 @@ func (p *projectResourceJSON) ToProjectResourceModel(ctx context.Context) (*proj
 	m.CreatedAt = types.StringValue(p.Project.CreatedAt)
 	m.UpdatedAt = types.StringValue(p.Project.UpdatedAt)
 
-	/*if p.Settings != nil {
-		pg, _ := types.MapValueFrom(ctx, types.StringType, p.Settings.PgSettings)
-		settings := endpointSettingsModel{
-			PgSettings: pg,
-		}
-		aux, _ := types.ObjectValueFrom(ctx, typeFromAttrs(defaultSettingsResourceAttr()), settings)
-		m.Settings = aux
-	}*/
 	if p.Branch != nil {
 		branchModel, diags := p.Branch.ToBranchResourceModel(ctx)
 		if diags.HasError() {
@@ -196,11 +182,6 @@ func (m *projectResourceModel) ToProjectResourceJSON(ctx context.Context) (*proj
 			UpdatedAt:             m.UpdatedAt.ValueString(),
 		},
 	}
-	/*if !m.Settings.IsNull() {
-		v := endpointSettingsModel{}
-		m.Settings.As(ctx, &v, basetypes.ObjectAsOptions{})
-		p.Settings = v.ToEndpointSettingsJSON()
-	}*/
 	if !m.Branch.IsNull() {
 		aux, diags := toBranchJSON(&m.Branch, ctx)
 		if diags.HasError() {

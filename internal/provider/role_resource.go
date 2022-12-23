@@ -187,7 +187,6 @@ func (r roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	roleObj, diags := toRoleModel(&inner.Role, ctx, data.ProjectID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		//what should i do?
 		return
 	}
 	diags = resp.State.Set(ctx, roleObj)

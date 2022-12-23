@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -15,17 +14,13 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces
-var _ datasource.DataSource = endpointDataResource{}
+var _ datasource.DataSource = &endpointDataSource{}
 
-func NewDataResource() datasource.DataSource {
-	return endpointDataResource{}
+type endpointDataSource struct {
+	client *resty.Client
 }
 
-type endpointDataResource struct {
-	client *http.Client
-}
-
-type endpointDataResourceModel struct {
+type endpointDataModel struct {
 	Host                  types.String `tfsdk:"host"`
 	Id                    types.String `tfsdk:"id"`
 	ProjectID             types.String `tfsdk:"project_id"`
@@ -36,27 +31,93 @@ type endpointDataResourceModel struct {
 	Type                  types.String `tfsdk:"type"`
 	CurrentState          types.String `tfsdk:"current_state"`
 	PendingState          types.String `tfsdk:"pending_state"`
-	Settings              struct {
-		Description types.String `tfsdk:"description"`
-		PgSettings  types.Map    `tfsdk:"pg_settings"`
-	} `tfsdk:"settings"`
-	PoolerEnabled      types.Bool   `tfsdk:"pooler_enabled"`
-	PoolerMode         types.String `tfsdk:"pooler_mode"`
-	Disabled           types.Bool   `tfsdk:"disabled"`
-	PasswordlessAccess types.Bool   `tfsdk:"passwordless_access"`
-	LastActive         types.String `tfsdk:"last_active"`
-	CreatedAt          types.String `tfsdk:"created_at"`
-	UpdatedAt          types.String `tfsdk:"updated_at"`
+	PoolerEnabled         types.Bool   `tfsdk:"pooler_enabled"`
+	PoolerMode            types.String `tfsdk:"pooler_mode"`
+	Disabled              types.Bool   `tfsdk:"disabled"`
+	PasswordlessAccess    types.Bool   `tfsdk:"passwordless_access"`
+	LastActive            types.String `tfsdk:"last_active"`
+	CreatedAt             types.String `tfsdk:"created_at"`
+	UpdatedAt             types.String `tfsdk:"updated_at"`
 }
 
-func (r endpointDataResource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+type endpointDataJSON struct {
+	Host                  string                `json:"host"`
+	Id                    string                `json:"id"`
+	ProjectID             string                `json:"project_id"`
+	BranchID              string                `json:"branch_id"`
+	AutoscalingLimitMinCu int64                 `json:"autoscaling_limit_min_cu"`
+	AutoscalingLimitMaxCu int64                 `json:"autoscaling_limit_max_cu"`
+	RegionID              string                `json:"region_id"`
+	Type                  string                `json:"type"`
+	CurrentState          string                `json:"current_state"`
+	PendingState          string                `json:"pending_state"`
+	Settings              *endpointSettingsJSON `json:"settings"`
+	PoolerEnabled         bool                  `json:"pooler_enabled"`
+	PoolerMode            string                `json:"pooler_mode"`
+	Disabled              bool                  `json:"disabled"`
+	PasswordlessAccess    bool                  `json:"passwordless_access"`
+	LastActive            string                `json:"last_active"`
+	CreatedAt             string                `json:"created_at"`
+	UpdatedAt             string                `json:"updated_at"`
+}
+
+func (in *endpointDataJSON) ToEndpointDataModel() *endpointDataModel {
+	return &endpointDataModel{
+		Host:                  types.StringValue(in.Host),
+		Id:                    types.StringValue(in.Id),
+		ProjectID:             types.StringValue(in.ProjectID),
+		BranchID:              types.StringValue(in.BranchID),
+		AutoscalingLimitMinCu: types.Int64Value(in.AutoscalingLimitMinCu),
+		AutoscalingLimitMaxCu: types.Int64Value(in.AutoscalingLimitMaxCu),
+		RegionID:              types.StringValue(in.RegionID),
+		Type:                  types.StringValue(in.Type),
+		CurrentState:          types.StringValue(in.CurrentState),
+		PendingState:          types.StringValue(in.PendingState),
+		PoolerEnabled:         types.BoolValue(in.PoolerEnabled),
+		PoolerMode:            types.StringValue(in.PoolerMode),
+		Disabled:              types.BoolValue(in.Disabled),
+		PasswordlessAccess:    types.BoolValue(in.PasswordlessAccess),
+		LastActive:            types.StringValue(in.LastActive),
+		CreatedAt:             types.StringValue(in.CreatedAt),
+		UpdatedAt:             types.StringValue(in.UpdatedAt),
+	}
+}
+
+// Metadata implements datasource.DataSource
+func (*endpointDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_endpoint"
 }
 
-func (r endpointDataResource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		MarkdownDescription: "Neon endpoint resource",
+// Read implements datasource.DataSource
+func (d *endpointDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data endpointDataModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	response, _ := d.client.R().Get(fmt.Sprintf("/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString()))
+	if response.IsError() {
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
+		return
+	}
+	endpoint := struct {
+		Endpoint endpointDataJSON `json:"endpoint"`
+	}{}
+	err := json.Unmarshal(response.Body(), &endpoint)
+	data = *endpoint.Endpoint.ToEndpointDataModel()
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
+		return
+	}
+	diags = resp.State.Set(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+}
+
+// Schema implements datasource.DataSource
+func (*endpointDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				MarkdownDescription: "neon host",
@@ -68,11 +129,11 @@ func (r endpointDataResource) Schema(ctx context.Context, req datasource.SchemaR
 			},
 			"project_id": schema.StringAttribute{
 				MarkdownDescription: "project id",
-				Required:            true,
+				Computed:            true,
 			},
 			"branch_id": schema.StringAttribute{
 				MarkdownDescription: "postgres branch",
-				Required:            true,
+				Computed:            true,
 			},
 			"autoscaling_limit_min_cu": schema.Int64Attribute{
 				MarkdownDescription: "autoscaling limit min",
@@ -100,18 +161,6 @@ func (r endpointDataResource) Schema(ctx context.Context, req datasource.SchemaR
 				MarkdownDescription: "pending state",
 				Computed:            true,
 				Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
-			},
-			"settings": schema.ListNestedAttribute{
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"description": schema.StringAttribute{
-							Required: true,
-						},
-						"pg_settings": schema.MapNestedAttribute{
-							Required: true,
-						},
-					},
-				},
 			},
 			"pooler_enabled": schema.BoolAttribute{
 				MarkdownDescription: "pooler enabled",
@@ -145,47 +194,4 @@ func (r endpointDataResource) Schema(ctx context.Context, req datasource.SchemaR
 			},
 		},
 	}
-}
-func (d endpointDataResource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data endpointDataResourceModel
-	diags := req.Config.Get(ctx, &data)
-	resp.Diagnostics.Append(diags...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	key, ok := os.LookupEnv("NEON_API_KEY")
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unable to find token",
-			"token cannot be an empty string",
-		)
-		return
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", data.ProjectID.ValueString(), data.Id.ValueString())
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create the request", err.Error())
-		return
-	}
-	request.Header.Add("Authorization", "Bearer "+key)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := d.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create endpoint", err.Error())
-		return
-	}
-	defer response.Body.Close()
-	endpoint := struct {
-		Endpoint endpointDataResourceModel `json:"endpoint"`
-	}{}
-	err = json.NewDecoder(response.Body).Decode(&endpoint)
-	data = endpoint.Endpoint
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to unmarshal response", err.Error())
-		return
-	}
-	//tflog.Trace(ctx, "created a resource")
-	diags = resp.State.Set(ctx, &data)
-	resp.Diagnostics.Append(diags...)
 }

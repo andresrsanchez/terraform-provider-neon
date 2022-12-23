@@ -143,7 +143,6 @@ func (r databaseResource) Create(ctx context.Context, req resource.CreateRequest
 	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		//what should i do?
 		return
 	}
 	diags = resp.State.Set(ctx, databaseObj)
@@ -194,7 +193,6 @@ func (r databaseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		//what should i do?
 		return
 	}
 	diags = resp.State.Set(ctx, databaseObj)
@@ -250,7 +248,6 @@ func (r databaseResource) Update(ctx context.Context, req resource.UpdateRequest
 	databaseObj, diags := toDatabaseModel(&inner.Database, data.ProjectID.ValueString(), ctx)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		//what should i do?
 		return
 	}
 	diags = resp.State.Set(ctx, databaseObj)
