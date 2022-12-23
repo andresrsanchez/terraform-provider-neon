@@ -128,23 +128,26 @@ func endpointResourceAttr() map[string]schema.Attribute {
 		},
 		"project_id": schema.StringAttribute{
 			MarkdownDescription: "project id",
-			Computed:            true,
+			Required:            true,
 		},
 		"branch_id": schema.StringAttribute{
 			MarkdownDescription: "postgres branch",
-			Computed:            true,
+			Required:            true,
 		},
 		"autoscaling_limit_min_cu": schema.Int64Attribute{
 			MarkdownDescription: "autoscaling limit min",
 			Computed:            true,
+			Optional:            true,
 		},
 		"autoscaling_limit_max_cu": schema.Int64Attribute{
 			MarkdownDescription: "autoscaling limit max",
 			Computed:            true,
+			Optional:            true,
 		},
 		"region_id": schema.StringAttribute{
 			MarkdownDescription: "region id",
 			Computed:            true,
+			Optional:            true,
 		},
 		"type": schema.StringAttribute{
 			MarkdownDescription: "type",
@@ -164,19 +167,23 @@ func endpointResourceAttr() map[string]schema.Attribute {
 		"pooler_enabled": schema.BoolAttribute{
 			MarkdownDescription: "pooler enabled",
 			Computed:            true,
+			Optional:            true,
 		},
 		"pooler_mode": schema.StringAttribute{
 			MarkdownDescription: "pooler mode",
 			Computed:            true,
+			Optional:            true,
 			Validators:          []validator.String{stringvalidator.OneOf("transaction")},
 		},
 		"disabled": schema.BoolAttribute{
 			MarkdownDescription: "disabled",
 			Computed:            true,
+			Optional:            true,
 		},
 		"passwordless_access": schema.BoolAttribute{
 			MarkdownDescription: "passwordless access",
 			Computed:            true,
+			Optional:            true,
 		},
 		//validate dates
 		"last_active": schema.StringAttribute{
@@ -216,22 +223,26 @@ func (r endpointResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	content := createEndpoint{
-		Branch_id:                data.BranchID.ValueString(),
-		Region_id:                data.RegionID.ValueString(),
-		Type:                     data.Type.ValueString(),
-		Autoscaling_limit_min_cu: data.AutoscalingLimitMinCu.ValueInt64(),
-		Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
-		Pooler_enabled:           data.PoolerEnabled.ValueBool(),
-		Pooler_mode:              data.PoolerMode.ValueString(),
-		Disabled:                 data.Disabled.ValueBool(),
-		Passwordless_access:      data.PasswordlessAccess.ValueBool(),
+	content := struct {
+		Endpoint createEndpoint `json:"endpoint"`
+	}{
+		Endpoint: createEndpoint{
+			Branch_id:                data.BranchID.ValueString(),
+			Region_id:                data.RegionID.ValueString(),
+			Type:                     data.Type.ValueString(),
+			Autoscaling_limit_min_cu: data.AutoscalingLimitMinCu.ValueInt64(),
+			Autoscaling_limit_max_cu: data.AutoscalingLimitMaxCu.ValueInt64(),
+			Pooler_enabled:           data.PoolerEnabled.ValueBool(),
+			Pooler_mode:              data.PoolerMode.ValueString(),
+			Disabled:                 data.Disabled.ValueBool(),
+			Passwordless_access:      data.PasswordlessAccess.ValueBool(),
+		},
 	}
 	response, _ := r.client.R().
 		SetBody(content).
 		Post(fmt.Sprintf("/projects/%s/endpoints", data.ProjectID.ValueString()))
 	if response.IsError() {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), string(response.Body()))
 		return
 	}
 	endpoint := struct {
@@ -307,7 +318,7 @@ func (r endpointResource) Update(ctx context.Context, req resource.UpdateRequest
 		SetBody(content).
 		Patch(fmt.Sprintf("/projects/%s/endpoints", data.ProjectID.ValueString()))
 	if response.IsError() {
-		resp.Diagnostics.AddError(fmt.Sprintf("Failed to create endpoint resource with a status code: %s", response.Status()), "")
+		resp.Diagnostics.AddError(fmt.Sprintf("Failed to update endpoint resource with a status code: %s", response.Status()), "")
 		return
 	}
 

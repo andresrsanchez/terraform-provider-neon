@@ -6,15 +6,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestProjectDataResource(t *testing.T) {
+func TestProjectDataSource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testProjectDataSource(),
-				Check:  resource.ComposeAggregateTestCheckFunc(
-				//resource.TestCheckResourceAttr("neon_project.test", "settings", "name"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.neon_project.test", "region_id", "aws-us-east-2"),
 				),
 			},
 		},
@@ -31,7 +31,7 @@ resource "neon_project" "test" {
 }
 
 data "neon_project" "test" {
-	name = "name"
+	id = neon_project.test.id
 }
 `
 }

@@ -13,8 +13,8 @@ func TestDatabaseDataSource(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testDatabaseDataSource(),
-				Check:  resource.ComposeAggregateTestCheckFunc(
-				//resource.TestCheckResourceAttr("data.neon_database.test", "name", "name"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.neon_database.test", "owner_name", "andresrsanchez"),
 				),
 			},
 		},
@@ -50,7 +50,7 @@ resource "neon_database" "test" {
 data "neon_database" "test" {
     project_id = neon_project.test.id
 	branch_id = neon_branch.test.id
-	name = "name_database"
+	name = neon_database.test.name
 }
 `
 }

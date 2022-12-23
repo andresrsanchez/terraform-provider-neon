@@ -100,6 +100,11 @@ func (p neon) DataSources(ctx context.Context) []func() datasource.DataSource {
 				client: p.client,
 			}
 		},
+		func() datasource.DataSource {
+			return &endpointDataSource{
+				client: p.client,
+			}
+		},
 	}
 }
 

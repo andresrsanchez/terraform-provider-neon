@@ -82,7 +82,7 @@ func (d *branchDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	response, _ := d.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s/endpoints", data.ProjectID.ValueString(), data.ID.ValueString()))
+	response, _ := d.client.R().Get(fmt.Sprintf("/projects/%s/branches/%s", data.ProjectID.ValueString(), data.ID.ValueString()))
 	if response.IsError() {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to delete branch resource with a status code: %s", response.Status()), "")
 		return
@@ -106,21 +106,18 @@ func (*branchDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed: true,
+				Required: true,
 			},
 			"project_id": schema.StringAttribute{
-				//Computed: true,
 				Required: true,
 			},
 			"parent_id": schema.StringAttribute{
 				Computed: true,
-				//Required: true,
 			},
 			"parent_lsn": schema.StringAttribute{
 				Computed: true,
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
 				Computed: true,
 			},
 			"current_state": schema.StringAttribute{

@@ -13,35 +13,33 @@ func TestEndpointDataSource(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testEndpointDataSource(),
-				Check:  resource.ComposeAggregateTestCheckFunc(
-				//resource.TestCheckResourceAttr("neon_endpoint.test", "branch_id", "branch"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.neon_endpoint.test", "region_id", "aws-us-east-2"),
 				),
 			},
 		},
 	})
 }
 
+//(neon_project.test): https://github.com/hashicorp/terraform/issues/31527
+
+//cannot create multiple read_write endpoints in a project (for now)
 func testEndpointDataSource() string {
 	return `
-provider "neon" {}
+resource "neon_project" "test" {
+	name = "name_project"
+}
+
 resource "neon_endpoint" "test" {
-	branch_id = "branch"
+	project_id = neon_project.test.id
+	branch_id = (neon_project.test).branch.id
 	type = "read_write"
-	project_id = "project"
-	settings = {
-		description = "first_description"
-		pg_settings = [{
-			description = "second_description"
-			test_setting = "test_first_setting"
-		}, {
-			description = "third_description"
-			test_setting = "test_second_setting"
-		}]
-	}
-	pooler_enabled = false
-	pooler_mode = "transaction"
-	disabled = false
-	passwordless_access = true
+	region_id = "aws-us-east-2"
+}
+
+data "neon_endpoint" "test" {
+    project_id = neon_project.test.id
+	id = neon_endpoint.test.id
 }
 `
 }

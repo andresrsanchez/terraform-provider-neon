@@ -11,9 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -40,15 +42,18 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "autoscaling limit min",
 				Computed:            true,
 				Optional:            true,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"autoscaling_limit_max_cu": schema.Int64Attribute{
 				MarkdownDescription: "autoscaling limit max",
 				Computed:            true,
 				Optional:            true,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"maintenance_starts_at": schema.StringAttribute{
 				MarkdownDescription: "neon host",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"id": schema.StringAttribute{
 				MarkdownDescription: "neon host",
@@ -72,6 +77,7 @@ func (r projectResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Computed:            true,
 				Optional:            true,
 				Validators:          []validator.String{stringvalidator.OneOf("k8s-pod", "k8s-neonvm", "docker")},
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"pg_version": schema.Int64Attribute{
 				MarkdownDescription: "neon host",

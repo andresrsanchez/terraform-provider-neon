@@ -6,22 +6,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestBranchDataResource(t *testing.T) {
+func TestBranchDataSource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testBranchDataResource(),
-				Check:  resource.ComposeAggregateTestCheckFunc(
-				//resource.TestCheckResourceAttr("neon_project.test", "name", "name_project"),
+				Config: testBranchDataSource(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.neon_branch.test", "name", "name_branch"),
 				),
 			},
 		},
 	})
 }
 
-func testBranchDataResource() string {
+func testBranchDataSource() string {
 	return `
 resource "neon_project" "test" {
 	name = "name_project"
@@ -41,7 +41,7 @@ resource "neon_branch" "test" {
 
 data "neon_branch" "test" {
     project_id = neon_project.test.id
-	name = "name_branch"
+	id = neon_branch.test.id
 }
 `
 }

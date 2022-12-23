@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -22,46 +21,37 @@ type projectDataSource struct {
 }
 
 type projectDataModel struct {
-	MaintenanceStartsAt types.String `tfsdk:"maintenance_starts_at"`
-	ID                  types.String `tfsdk:"id"`
-	PlatformID          types.String `tfsdk:"platform_id"`
-	RegionID            types.String `tfsdk:"region_id"`
-	Name                types.String `tfsdk:"name"`
-	Provisioner         types.String `tfsdk:"engine"`
-	PgVersion           types.Int64  `tfsdk:"pg_version"`
-	LastActive          types.String `tfsdk:"last_active"`
-	CreatedAt           types.String `tfsdk:"created_at"`
-	UpdatedAt           types.String `tfsdk:"updated_at"`
-	Host                types.String `tfsdk:"proxy_host"`
+	ID         types.String `tfsdk:"id"`
+	PlatformID types.String `tfsdk:"platform_id"`
+	RegionID   types.String `tfsdk:"region_id"`
+	Name       types.String `tfsdk:"name"`
+	PgVersion  types.Int64  `tfsdk:"pg_version"`
+	LastActive types.String `tfsdk:"last_active"`
+	CreatedAt  types.String `tfsdk:"created_at"`
+	UpdatedAt  types.String `tfsdk:"updated_at"`
 }
 
 type projectDataJSON struct {
-	MaintenanceStartsAt string `json:"maintenance_starts_at"`
-	ID                  string `json:"id"`
-	PlatformID          string `json:"platform_id"`
-	RegionID            string `json:"region_id"`
-	Name                string `json:"name"`
-	Provisioner         string `json:"engine"`
-	PgVersion           int64  `json:"pg_version"`
-	LastActive          string `json:"last_active"`
-	CreatedAt           string `json:"created_at"`
-	UpdatedAt           string `json:"updated_at"`
-	Host                string `json:"proxy_host"`
+	ID         string `json:"id"`
+	PlatformID string `json:"platform_id"`
+	RegionID   string `json:"region_id"`
+	Name       string `json:"name"`
+	PgVersion  int64  `json:"pg_version"`
+	LastActive string `json:"last_active"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 func (in *projectDataJSON) ToProjectDataModel() *projectDataModel {
 	return &projectDataModel{
-		MaintenanceStartsAt: types.StringValue(in.MaintenanceStartsAt),
-		ID:                  types.StringValue(in.ID),
-		PlatformID:          types.StringValue(in.PlatformID),
-		RegionID:            types.StringValue(in.RegionID),
-		Name:                types.StringValue(in.Name),
-		Provisioner:         types.StringValue(in.Provisioner),
-		PgVersion:           types.Int64Value(in.PgVersion),
-		LastActive:          types.StringValue(in.LastActive),
-		CreatedAt:           types.StringValue(in.CreatedAt),
-		UpdatedAt:           types.StringValue(in.UpdatedAt),
-		Host:                types.StringValue(in.Host),
+		ID:         types.StringValue(in.ID),
+		PlatformID: types.StringValue(in.PlatformID),
+		RegionID:   types.StringValue(in.RegionID),
+		Name:       types.StringValue(in.Name),
+		PgVersion:  types.Int64Value(in.PgVersion),
+		LastActive: types.StringValue(in.LastActive),
+		CreatedAt:  types.StringValue(in.CreatedAt),
+		UpdatedAt:  types.StringValue(in.UpdatedAt),
 	}
 }
 
@@ -102,18 +92,6 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 func (*projectDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"autoscaling_limit_min_cu": schema.Int64Attribute{
-				MarkdownDescription: "autoscaling limit min",
-				Computed:            true,
-			},
-			"autoscaling_limit_max_cu": schema.Int64Attribute{
-				MarkdownDescription: "autoscaling limit max",
-				Computed:            true,
-			},
-			"maintenance_starts_at": schema.StringAttribute{
-				MarkdownDescription: "neon host",
-				Computed:            true,
-			},
 			"id": schema.StringAttribute{
 				MarkdownDescription: "neon host",
 				Required:            true,
@@ -128,12 +106,7 @@ func (*projectDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "neon host",
-				Required:            true,
-			},
-			"engine": schema.StringAttribute{
-				MarkdownDescription: "neon host",
 				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("k8s-pod", "k8s-neonvm", "docker")},
 			},
 			"pg_version": schema.Int64Attribute{
 				MarkdownDescription: "neon host",

@@ -6,10 +6,8 @@ import (
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -125,11 +123,11 @@ func (*endpointDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			},
 			"id": schema.StringAttribute{
 				MarkdownDescription: "endpoint id",
-				Computed:            true,
+				Required:            true,
 			},
 			"project_id": schema.StringAttribute{
 				MarkdownDescription: "project id",
-				Computed:            true,
+				Required:            true,
 			},
 			"branch_id": schema.StringAttribute{
 				MarkdownDescription: "postgres branch",
@@ -149,18 +147,15 @@ func (*endpointDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			},
 			"type": schema.StringAttribute{
 				MarkdownDescription: "type",
-				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("read_write", "read_only")},
+				Computed:            true,
 			},
 			"current_state": schema.StringAttribute{
 				MarkdownDescription: "current state",
 				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
 			},
 			"pending_state": schema.StringAttribute{
 				MarkdownDescription: "pending state",
 				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("init", "active", "idle")},
 			},
 			"pooler_enabled": schema.BoolAttribute{
 				MarkdownDescription: "pooler enabled",
@@ -169,7 +164,6 @@ func (*endpointDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			"pooler_mode": schema.StringAttribute{
 				MarkdownDescription: "pooler mode",
 				Computed:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("transaction")},
 			},
 			"disabled": schema.BoolAttribute{
 				MarkdownDescription: "disabled",
